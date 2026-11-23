@@ -1,3 +1,15 @@
+> ## This fork: the diorama edition (LG)
+>
+> A different look for LG TVs on top of Free My TV: the home screen is a miniature city that follows your live
+> weather, full screen, with a big clock over its sky. Any button opens a menu column (cream by day, ink by night).
+> Also: moving scenes, weather effects, the real moon, space-station and aurora alerts, lights that go off late at
+> night, a live-sky screensaver after dark, Guest Wi-Fi as a QR code, a focus timer, and Antakshari.
+>
+> **Installing it on a family TV: [INSTALL-FAMILY.md](INSTALL-FAMILY.md)** (no coding). Building it yourself:
+> `python3 webos/get_scenes.py && python3 webos/build.py`, then `python3 webos/install.py <TV IP>`.
+> The pictures live in a scene pack on the releases, not in git ([scenes/README.md](scenes/README.md)), and the
+> look needs webOS 4 or newer. Everything below is upstream's README, and applies here too.
+
 <div align="center">
 
 <img src="docs/assets/icon-512.png" width="96" alt="">

@@ -1,0 +1,30 @@
+# This fork: tag a version (git tag v1.6.0 && git push --tags) and this builds the LG app with the scene pack and
+# attaches FreeMyTV-webos.ipk to a GitHub release of that name, for INSTALL-FAMILY.md's step 2.
+name: Release (LG)
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Scene pack
+        run: python3 webos/get_scenes.py
+      - name: Build (generic: the TV's time zone picks the city until one is chosen on the TV)
+        run: python3 webos/build.py --generic
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then echo "Run this from a tag."; exit 1; fi
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" \
+            --notes "Install on an LG TV: see INSTALL-FAMILY.md. Download FreeMyTV-webos.ipk below."
+          gh release upload "$TAG" FreeMyTV-webos.ipk --clobber

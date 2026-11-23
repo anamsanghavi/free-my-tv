@@ -18,6 +18,8 @@ concurrency:
 
 jobs:
   deploy:
+    # upstream's website (freemytv.io): never from a fork
+    if: github.repository == 'simbasjungles/free-my-tv'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
