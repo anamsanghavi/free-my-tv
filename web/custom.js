@@ -37,6 +37,9 @@ var Custom = (function () {
   // the visuals: the old media-player kind, drawn small (480×270) and scaled up, so they're cheap and a bit pixelly on purpose
   var VIS_MODES = ['tunnel', 'bars', 'scope', 'off'], VIS_NAMES = {tunnel: 'Tunnel', bars: 'Bars', scope: 'Scope', off: 'Off'};
   var VIS_W = 480, VIS_H = 270;
+  // LG and Samsung play <audio> in the TV's own media pipeline: an analyser on it reads only zeros. There the stations get a
+  // made-up beat, and what can be heard through Web Audio (the noise, the rain loop) drives the visuals for real.
+  var MEDIA_TAP = !/Web0S|webOS|Tizen|SMART-TV/i.test(navigator.userAgent);
   var genreCache = {};
   var BOLLYWOOD_VIDEO = '_i0oA5YYf1Y';   // the YouTube video the Bollywood button plays
   var FOCUS_MIN = 25, BREAK_MIN = 5;
@@ -1204,7 +1207,8 @@ var Custom = (function () {
       try {
         // With the visuals on, the stream is asked for with CORS, so the analyser may read it; a station that refuses is
         // played again without (the visuals then keep an approximate beat), and remembered for this session.
-        var a = new Audio(), started = false, cors = study.visMode !== 'off' && !study.noCors[snd.url], fail = function () {
+        if (snd.loop && !/^https?:/.test(snd.url) && playBuffer(snd)) { musicLine(); if (study.picker) renderPicker(); return; }
+        var a = new Audio(), started = false, cors = MEDIA_TAP && study.visMode !== 'off' && !study.noCors[snd.url], fail = function () {
           if (study && study.audio === a && !started) { study.failed = true; musicLine(); }
         };
         a.loop = !!snd.loop;
@@ -1227,6 +1231,37 @@ var Custom = (function () {
     }
     musicLine();
     if (study.picker) renderPicker();
+  }
+
+  /** A loop that ships with the app, decoded and played through Web Audio, so the visuals can hear it. */
+  function playBuffer(snd) {
+    var an = visGraph();
+    if (!an) return false;
+    var ctx = study.ctx, want = snd, x = new XMLHttpRequest();
+    try {
+      x.open('GET', snd.url, true);
+      x.responseType = 'arraybuffer';
+      x.onload = function () {
+        if (!study || study.current !== want || !x.response) return;
+        ctx.decodeAudioData(x.response, function (buf) {
+          if (!study || study.current !== want) return;
+          var src = ctx.createBufferSource(), gain = ctx.createGain();
+          src.buffer = buf;
+          src.loop = true;
+          gain.gain.value = 0;
+          src.connect(gain);
+          gain.connect(an);
+          src.start();
+          gain.gain.setTargetAtTime(0.6, ctx.currentTime, 0.6);
+          if (!study.paused) ctx.resume();
+          study.noise = src;
+          study.synced = true;
+        }, function () { if (study && study.current === want) { study.failed = true; musicLine(); } });
+      };
+      x.onerror = function () { if (study && study.current === want) { study.failed = true; musicLine(); } };
+      x.send();
+      return true;
+    } catch (e) { return false; }
   }
 
   /** The analyser everything plays through while the visuals are on. */
@@ -1254,13 +1289,22 @@ var Custom = (function () {
     } else if (study.synced && study.analyser) {
       study.analyser.getByteFrequencyData(f);
       study.analyser.getByteTimeDomainData(w);
+      var peak = 0;
+      for (i = 0; i < 64; i++) if (f[i] > peak) peak = f[i];
+      study.silentFrames = peak ? 0 : (study.silentFrames || 0) + 1;
+      if (study.silentFrames > 90 && study.audio) study.synced = false;   // reads only zeros: this browser can't tap it
     } else {
-      var beat = Math.pow(Math.max(0, Math.sin(t * Math.PI * 1.5)), 8);
+      // a made-up groove at 92 bpm: kick on 1 and 3, snare on 2 and 4, hats on the eighths, chords drifting in the mids
+      var beatLen = 60 / 92, ph = (t % (beatLen * 4)) / beatLen, b = Math.floor(ph), fr = ph - b;
+      var kick = (b % 2 === 0) ? Math.exp(-fr * 7) : 0, snare = (b % 2 === 1) ? Math.exp(-fr * 9) : 0, hat = Math.exp(-((ph * 2) % 1) * 14);
       for (i = 0; i < f.length; i++) {
-        var x = i / f.length, wob = 0.5 + 0.5 * Math.sin(t * 3 + i * 0.3) * Math.sin(t * 1.7 + i * 0.11);
-        f[i] = Math.min(255, Math.pow(1 - x, 1.5) * 190 * (0.45 + 0.55 * wob) + beat * 110 * (1 - x));
+        var x = i / f.length, chord = 0.5 + 0.5 * Math.sin(t * 0.9 + i * 0.21) * Math.sin(t * 0.37 + i * 0.05);
+        var v = 70 * Math.exp(-x * 2.2) + 150 * kick * Math.exp(-x * 14) + 90 * snare * Math.exp(-Math.pow((x - 0.3) * 6, 2)) +
+          110 * chord * Math.exp(-Math.pow((x - 0.18) * 5, 2)) + 60 * hat * Math.exp(-Math.pow((x - 0.62) * 5, 2));
+        f[i] = Math.min(255, v * (0.85 + 0.3 * Math.random()));
       }
-      for (i = 0; i < w.length; i++) w[i] = 128 + 55 * (0.4 + 0.6 * beat) * Math.sin(i * 0.08 + t * 6) * Math.sin(i * 0.013 + t);
+      for (i = 0; i < w.length; i++)
+        w[i] = 128 + (40 * kick * Math.sin(i * 0.05) + 22 * Math.sin(i * 0.11 + t * 2) * (0.5 + chord) + 12 * snare * (Math.random() - 0.5) * 2) * 0.9;
     }
   }
 
@@ -1270,27 +1314,52 @@ var Custom = (function () {
     for (i = 0; i < 8; i++) bass += f[i];
     bass /= 8 * 255;
     if (mode === 'tunnel') {
-      // the picture fed back into itself, a little bigger and turned, with a ring of the waveform at the centre
+      // the picture fed back into itself, bigger and turned a little, so everything drawn flies outward and swirls;
+      // spokes of the spectrum from the centre and a glowing ring of the waveform feed it, and a kick sends out a ring
       g.save();
-      g.globalAlpha = 0.93;
+      g.globalAlpha = 0.9;
       g.translate(VIS_W / 2, VIS_H / 2);
-      g.rotate(0.01 + bass * 0.035);
-      var z = 1.03 + bass * 0.04;
+      g.rotate(0.006 + bass * 0.03 + Math.sin(t * 0.21) * 0.01);
+      var z = 1.025 + bass * 0.05;
       g.scale(z, z);
       g.drawImage(c, -VIS_W / 2, -VIS_H / 2);
       g.restore();
-      g.fillStyle = 'rgba(0,0,0,0.07)';
+      g.fillStyle = 'rgba(4,2,10,0.10)';
       g.fillRect(0, 0, VIS_W, VIS_H);
-      g.strokeStyle = 'hsl(' + Math.round(t * 45 + bass * 140) % 360 + ',100%,62%)';
+      var hue = Math.round(t * 30) % 360, cx = VIS_W / 2, cy = VIS_H / 2;
+      g.globalCompositeOperation = 'lighter';
+      var spokes = 48;
       g.lineWidth = 2;
-      g.beginPath();
-      var r = 26 + bass * 70, n = 96;
-      for (i = 0; i <= n; i++) {
-        var a = i / n * Math.PI * 2, rr = r + (w[(i * 5) % w.length] - 128) * 0.35;
-        var x = VIS_W / 2 + Math.cos(a) * rr, y = VIS_H / 2 + Math.sin(a) * rr;
-        if (i) g.lineTo(x, y); else g.moveTo(x, y);
+      for (i = 0; i < spokes; i++) {
+        var v2 = f[Math.floor(Math.pow(i / spokes, 1.5) * 120)] / 255, ang = i / spokes * Math.PI * 2 + t * 0.4;
+        if (v2 < 0.12) continue;
+        g.strokeStyle = 'hsla(' + (hue + i * 7) % 360 + ',100%,60%,' + (v2 * 0.8).toFixed(2) + ')';
+        g.beginPath();
+        g.moveTo(cx + Math.cos(ang) * 18, cy + Math.sin(ang) * 18);
+        g.lineTo(cx + Math.cos(ang) * (18 + v2 * 70), cy + Math.sin(ang) * (18 + v2 * 70));
+        g.stroke();
       }
-      g.stroke();
+      var r = 22 + bass * 46, n = 120;
+      for (var pass = 0; pass < 2; pass++) {
+        g.lineWidth = pass ? 1.6 : 6;
+        g.strokeStyle = 'hsla(' + (hue + 180) % 360 + ',100%,' + (pass ? 75 : 55) + '%,' + (pass ? 0.95 : 0.25) + ')';
+        g.beginPath();
+        for (i = 0; i <= n; i++) {
+          var a2 = i / n * Math.PI * 2, rr = r + (w[(i * 4) % w.length] - 128) * 0.4;
+          var x2 = cx + Math.cos(a2) * rr, y2 = cy + Math.sin(a2) * rr;
+          if (i) g.lineTo(x2, y2); else g.moveTo(x2, y2);
+        }
+        g.stroke();
+      }
+      if (bass > 0.55 && t - (study.lastKick || 0) > 0.3) {
+        study.lastKick = t;
+        g.lineWidth = 3;
+        g.strokeStyle = 'hsla(' + (hue + 90) % 360 + ',100%,70%,0.9)';
+        g.beginPath();
+        g.arc(cx, cy, r + 10, 0, Math.PI * 2);
+        g.stroke();
+      }
+      g.globalCompositeOperation = 'source-over';
     } else if (mode === 'bars') {
       g.fillStyle = 'rgba(0,0,0,0.4)';
       g.fillRect(0, 0, VIS_W, VIS_H);
