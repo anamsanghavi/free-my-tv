@@ -129,6 +129,27 @@ def build(preview, config, generic=False, hd=False):
     if apps:
         config = dict(config, installedApps=apps)
     app = webapp.files(config, 'webos/build.py')
+    # The scene pack (scenes/, git-ignored): the weather dioramas, their videos, lights and sounds, and the screensaver's
+    # space photos, with their listings (dioramas.js, spacelocal.js), which replace web/'s empty ones. Without it the
+    # app still works: the space photos come from the internet and the home screen has no dioramas.
+    scenes = os.path.join(ROOT, 'scenes')
+    if os.path.isdir(scenes):
+        pack = [n for n in sorted(os.listdir(scenes)) if not n.startswith('.') and n != 'README.md' and os.path.isfile(os.path.join(scenes, n))]
+        for n in pack:
+            with open(os.path.join(scenes, n), 'rb') as f:
+                app[n] = f.read()
+        print('With the scene pack: %d files.' % len(pack))
+    else:
+        print('No scene pack (scenes/): building without the dioramas. python3 webos/get_scenes.py fetches it.')
+    # Local addition: your own screensaver photos, made by webos/my_photos.py in ~/Pictures/FreeMyTV-screensaver.
+    mine_dir = os.path.expanduser('~/Pictures/FreeMyTV-screensaver')
+    mine = sorted(n for n in os.listdir(mine_dir) if n.lower().endswith('.jpg')) if os.path.isdir(mine_dir) else []
+    for n in mine:
+        with open(os.path.join(mine_dir, n), 'rb') as f:
+            app['myphotos/' + n] = f.read()
+    app['myphotos.js'] = ('window.MY_PHOTOS = %s;\n' % json.dumps(['myphotos/' + n for n in mine])).encode('utf-8')
+    if mine:
+        print('With %d of your own photos for the screensaver.' % len(mine))
     app.update(icons)
     for name in ('appinfo.json', 'icon.png', 'largeIcon.png'):
         with open(os.path.join(ROOT, 'webos', name), 'rb') as f:

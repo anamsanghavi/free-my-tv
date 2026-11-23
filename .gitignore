@@ -17,3 +17,14 @@ __pycache__/
 # macOS
 .DS_Store
 tools/.i18n-cache.json
+
+# This fork: the scene pack is too big for git (webos/get_scenes.py fetches it from the releases)
+scenes/*
+!scenes/README.md
+# your own screensaver photos (webos/my_photos.py)
+web/myphotos.js
+web/myphotos/
+# saved gallery pages make_space.py reads
+webb/
+spitzer/
+*.tar
