@@ -19,7 +19,7 @@ PACK = 'https://github.com/anamsanghavi/free-my-tv/releases/download/scenes-1/sc
 
 def main():
     url = sys.argv[1] if len(sys.argv) > 1 else PACK
-    print('Downloading the scene pack (about 50 MB) from', url)
+    print('Downloading the scene pack (about 60 MB) from', url)
     with urllib.request.urlopen(url, timeout=120) as r:
         data = r.read()
     z = zipfile.ZipFile(io.BytesIO(data))
