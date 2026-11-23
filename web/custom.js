@@ -12,8 +12,17 @@ var Custom = (function () {
   'use strict';
 
   var NASA_KEY = String((window.CONFIG && CONFIG.nasaKey) || 'DEMO_KEY');
-  var STUDY_RADIO = 'https://ice1.somafm.com/fluid-128-mp3';   // SomaFM Fluid: instrumental hip-hop, listener-supported
-  var STUDY_RADIO_NAME = 'SomaFM Fluid · instrumental hip-hop';
+  // Study's sounds: ↑ ↓ pick one, the choice is kept. SomaFM is listener-supported, no ads; the rain is the storm scene's own loop.
+  var STUDY_SOUNDS = [
+    {name: 'Fluid · instrumental hip-hop', url: 'https://ice1.somafm.com/fluid-128-mp3'},
+    {name: 'Groove Salad · chilled downtempo', url: 'https://ice1.somafm.com/groovesalad-128-mp3'},
+    {name: 'Sonic Universe · modern jazz', url: 'https://ice1.somafm.com/sonicuniverse-128-mp3'},
+    {name: 'Bossa Beyond · bossa nova', url: 'https://ice1.somafm.com/bossa-128-mp3'},
+    {name: 'Deep Space One · ambient', url: 'https://ice1.somafm.com/deepspaceone-128-mp3'},
+    {name: 'Drone Zone · slow ambient', url: 'https://ice1.somafm.com/dronezone-128-mp3'},
+    {name: 'Rain and distant thunder', url: 'sound-thunderstorm.ogg', loop: true},
+    {name: 'Silence', url: ''}
+  ];
   var BOLLYWOOD_VIDEO = '_i0oA5YYf1Y';   // the YouTube video the Bollywood button plays
   var FOCUS_MIN = 25, BREAK_MIN = 5;
 
@@ -1092,7 +1101,7 @@ var Custom = (function () {
     for (var i = 0; i < 4; i++) dots += i < (study.done % 4) ? '●' : '○';
     s.querySelector('.dots').textContent = dots;
     setClass(s, 'paused', study.paused);
-    s.querySelector('.hint').textContent = (study.paused ? 'Paused · OK to carry on' : 'OK to pause') + '  ·  → to skip  ·  Back to leave';
+    s.querySelector('.hint').textContent = (study.paused ? 'Paused · OK to carry on' : 'OK to pause') + '  ·  ↑ ↓ sound  ·  → skip  ·  Back to leave';
     if (!study.paused && left === 0) { studyNext(); studyDraw(); }
   }
 
@@ -1116,18 +1125,32 @@ var Custom = (function () {
     el('div', 'phase', s);
     el('div', 'time', s);
     el('div', 'dots', s);
-    el('div', 'music', s, '♪ ' + STUDY_RADIO_NAME);
+    el('div', 'music', s);
     el('div', 'hint', s);
-    study = {focus: true, length: FOCUS_MIN * 60, start: Date.now(), paused: false, pausedAt: 0, done: 0, timer: 0, audio: null};
-    try {
-      study.audio = new Audio(STUDY_RADIO);
-      study.audio.volume = 0.6;
-      playRadio();
-    } catch (e) {}
+    study = {focus: true, length: FOCUS_MIN * 60, start: Date.now(), paused: false, pausedAt: 0, done: 0, timer: 0, audio: null, pick: 0};
+    var kept = stored('studySound');
+    for (var i = 0; i < STUDY_SOUNDS.length; i++) if (STUDY_SOUNDS[i].name === kept) study.pick = i;
+    studySound();
     setClass(s, 'on', true);
     overlayState();
     study.timer = setInterval(studyDraw, 500);
     studyDraw();
+  }
+
+  /** Swaps to the picked sound: the old stream is let go first, so two never play at once. */
+  function studySound() {
+    var snd = STUDY_SOUNDS[study.pick], s = $('study');
+    if (study.audio) { try { study.audio.pause(); study.audio.removeAttribute('src'); study.audio.load(); } catch (e) {} }
+    study.audio = null;
+    if (snd.url) {
+      try {
+        study.audio = new Audio(snd.url);
+        study.audio.loop = !!snd.loop;
+        study.audio.volume = 0.6;
+        if (!study.paused) playRadio();
+      } catch (e) {}
+    }
+    if (s) s.querySelector('.music').textContent = (snd.url ? '♪ ' : '') + snd.name + '   ·   ' + (study.pick + 1) + ' of ' + STUDY_SOUNDS.length;
   }
 
   function stopStudy() {
@@ -1148,6 +1171,13 @@ var Custom = (function () {
       return true;
     }
     if (k === keys.right) { studyNext(); studyDraw(); return true; }
+    if (k === keys.up || k === keys.down) {
+      var n = STUDY_SOUNDS.length;
+      study.pick = (study.pick + (k === keys.up ? n - 1 : 1)) % n;
+      store('studySound', STUDY_SOUNDS[study.pick].name);
+      studySound();
+      return true;
+    }
     return true;   // everything else stays in Study
   }
 
