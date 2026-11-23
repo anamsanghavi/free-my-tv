@@ -27,12 +27,15 @@ var Custom = (function () {
   ];
   var NOISES = [{name: 'Brown noise', noise: 'brown', meta: 'deep, like a far waterfall'},
     {name: 'Pink noise', noise: 'pink', meta: 'soft, like steady rain'}, {name: 'White noise', noise: 'white', meta: 'bright, like a fan'}];
+  // the picker's first page; Genres, Countries and Languages are read from Radio Browser, with these first in each
   var STUDY_GENRES = [
-    {name: 'Visuals', visuals: true}, {name: 'MilkDrop · next look', nextLook: true}, {name: 'Saved', saved: true}, {name: 'Lo-fi', tag: 'lofi'}, {name: 'Jazz', tag: 'jazz'}, {name: 'Classical', tag: 'classical'},
-    {name: 'Piano', tag: 'piano'}, {name: 'Ambient', tag: 'ambient'}, {name: 'Chillout', tag: 'chillout'},
-    {name: 'Indian classical', tag: 'indian classical'}, {name: 'Bollywood', tag: 'bollywood'}, {name: 'Ghazal', tag: 'ghazal'},
-    {name: 'Nature sounds', tag: 'nature'}, {name: 'Noise · works offline', noise: true}
+    {name: 'Visuals', visuals: true}, {name: 'MilkDrop · next look', nextLook: true}, {name: 'Saved', saved: true},
+    {name: 'Genres', list: 'tags', meta: 'all of them'}, {name: 'Countries', list: 'countries'}, {name: 'Languages', list: 'languages'},
+    {name: 'Most played worldwide', q: 'order=clickcount&reverse=true'}, {name: 'Noise · works offline', noise: true}
   ];
+  var PIN_TAGS = ['lofi', 'jazz', 'classical', 'piano', 'ambient', 'chillout', 'indian classical', 'bollywood', 'ghazal', 'nature'];
+  var PIN_COUNTRIES = ['CA', 'IN', 'US', 'GB'];
+  var PIN_LANGUAGES = ['hindi', 'gujarati', 'punjabi', 'english', 'french', 'urdu', 'tamil'];
   var SILENCE = {name: 'Silence'};
   // the visuals: the old media-player kind, drawn small (480×270) and scaled up, so they're cheap and a bit pixelly on purpose
   var VIS_MODES = ['milkdrop', 'tunnel', 'bars', 'scope', 'off'];
@@ -1193,6 +1196,7 @@ var Custom = (function () {
 
   function stopSound() {
     clearTimeout(study.watch);
+    tapStop();
     if (study.audio) { try { study.audio.pause(); study.audio.removeAttribute('src'); study.audio.load(); } catch (e) {} }
     if (study.noise) { try { study.noise.stop(); } catch (e) {} }
     study.audio = study.noise = null;
@@ -1200,10 +1204,12 @@ var Custom = (function () {
 
   function resumeSound() {
     if (study.audio) { try { var p = study.audio.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+    tapMaybe();
     if (study.ctx) { try { study.ctx.resume(); } catch (e) {} }
   }
   function pauseSound() {
     if (study.audio) study.audio.pause();
+    tapStop();
     if (study.ctx) { try { study.ctx.suspend(); } catch (e) {} }
   }
 
@@ -1237,6 +1243,7 @@ var Custom = (function () {
         }
         a.src = snd.url;
         study.audio = a;
+        tapMaybe();
         if (!study.paused) resumeSound();
         study.watch = setTimeout(fail, 10000);
       } catch (e) { study.failed = true; }
@@ -1276,6 +1283,104 @@ var Custom = (function () {
     } catch (e) { return false; }
   }
 
+  // MARK: live sync. Where the TV keeps a station's sound to itself, a second, silent copy of the stream is read here,
+  // decoded a second at a time and played into an analyser that never reaches the speakers, each piece placed as far
+  // ahead as the TV's player is behind what it has received, so the visuals land on the beat you hear. It costs a second
+  // download of the station (about 58 MB an hour at 128 kbps) and only runs while the visuals are on. A station whose
+  // server doesn't allow it falls back to the made-up groove.
+
+  function tapMaybe() {
+    var snd = study.current;
+    if (MEDIA_TAP || study.paused || study.visMode === 'off' || !snd || !snd.url || !/^https?:/.test(snd.url) || study.noTap[snd.url]) return;
+    if (study.tap && study.tap.url === snd.url) return;
+    if (!visGraph()) return;
+    tapStop();
+    var ctx = study.ctx, t = study.tap = {url: snd.url, xhr: null, pos: 0, bytes: [], len: 0, ok: false, fails: 0, an: null, sink: null, opened: 0};
+    try {
+      t.an = ctx.createAnalyser();
+      t.an.fftSize = 512;
+      t.an.smoothingTimeConstant = 0.72;
+      t.sink = ctx.createGain();
+      t.sink.gain.value = 0;   // pulled through so it runs, never heard
+      t.an.connect(t.sink);
+      t.sink.connect(ctx.destination);
+    } catch (e) { study.tap = null; return; }
+    tapOpen(t);
+  }
+
+  function tapOpen(t) {
+    var x = new XMLHttpRequest(), quit = function () { x.onprogress = x.onerror = x.onload = null; try { x.abort(); } catch (e) {} };
+    t.xhr = x;
+    t.pos = 0;
+    t.opened = Date.now();
+    var lost = function (refused) {
+      if (!refused && t.len && study && study.tap === t) tapDecode(t);   // what came before the end
+      quit();
+      if (!study || study.tap !== t) return;
+      if (++t.fails > 3 || (refused && !t.ok)) { study.noTap[t.url] = true; tapStop(); return; }   // refused, or keeps dropping: the groove
+      setTimeout(function () { if (study && study.tap === t) tapOpen(t); }, 1500);
+    };
+    try {
+      x.open('GET', t.url, true);
+      x.overrideMimeType('text/plain; charset=x-user-defined');   // bytes as they come, in an ES5-only browser
+      x.onprogress = function () {
+        if (!study || study.tap !== t) return quit();
+        var str = x.responseText, n = str.length;
+        if (n > t.pos) {
+          var b = new Uint8Array(n - t.pos);
+          for (var i = t.pos; i < n; i++) b[i - t.pos] = str.charCodeAt(i) & 255;
+          t.pos = n;
+          t.bytes.push(b);
+          t.len += b.length;
+          if (t.len >= 20000) tapDecode(t);
+        }
+        if (Date.now() - t.opened > 20000) { quit(); tapOpen(t); }   // a fresh request now and then: the text only grows
+      };
+      x.onerror = function () { lost(true); };
+      x.onload = function () { lost(false); };
+      x.send();
+    } catch (e) { lost(true); }
+  }
+
+  /** How far the TV's player is behind what it has received: where a decoded piece has to wait before it's "heard". */
+  function tapAhead() {
+    var a = study.audio;
+    try {
+      if (a && a.buffered && a.buffered.length) {
+        var v = a.buffered.end(a.buffered.length - 1) - a.currentTime;
+        if (v > 0.2 && v < 30) return v;
+      }
+    } catch (e) {}
+    return 2.5;
+  }
+
+  function tapDecode(t) {
+    var all = new Uint8Array(t.len), o = 0;
+    for (var i = 0; i < t.bytes.length; i++) { all.set(t.bytes[i], o); o += t.bytes[i].length; }
+    t.bytes = [];
+    t.len = 0;
+    var ctx = study.ctx, came = ctx.currentTime, ahead = tapAhead();
+    try {
+      ctx.decodeAudioData(all.buffer, function (buf) {
+        if (!study || study.tap !== t) return;
+        if (!t.ok) { t.ok = true; musicLine(); }
+        t.fails = 0;
+        var src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(t.an);
+        src.start(Math.max(ctx.currentTime, came + ahead - buf.duration));
+      }, function () {});
+    } catch (e) {}
+  }
+
+  function tapStop() {
+    var t = study && study.tap;
+    if (!t) return;
+    study.tap = null;
+    if (t.xhr) { t.xhr.onprogress = t.xhr.onerror = t.xhr.onload = null; try { t.xhr.abort(); } catch (e) {} }
+    try { t.an.disconnect(); t.sink.disconnect(); } catch (e) {}
+  }
+
   /** The analyser everything plays through while the visuals are on. */
   function visGraph() {
     if (study.analyser) return study.analyser;
@@ -1298,6 +1403,9 @@ var Custom = (function () {
     if (study.paused || (!snd.url && !snd.noise) || study.failed) {
       for (i = 0; i < f.length; i++) f[i] = f[i] * 0.9;
       for (i = 0; i < w.length; i++) w[i] = 128 + (w[i] - 128) * 0.9;
+    } else if (study.tap && study.tap.ok) {
+      study.tap.an.getByteFrequencyData(f);
+      study.tap.an.getByteTimeDomainData(w);
     } else if (study.synced && study.analyser) {
       study.analyser.getByteFrequencyData(f);
       study.analyser.getByteTimeDomainData(w);
@@ -1480,7 +1588,7 @@ var Custom = (function () {
   /** Feeds MilkDrop what's playing: the analyser when it can be read, else the made-up groove. */
   function mkFeed() {
     if (!study.mkViz) return;
-    var want = study.synced && study.analyser ? study.analyser : (study.current && (study.current.url || study.current.noise) ? mkGroove(study.ctx) : null);
+    var want = study.tap && study.tap.ok ? study.tap.an : study.synced && study.analyser ? study.analyser : (study.current && (study.current.url || study.current.noise) ? mkGroove(study.ctx) : null);
     if (want === study.mkFed) return;
     try { if (study.mkFed) study.mkViz.disconnectAudio(study.mkFed); } catch (e) {}
     study.mkFed = want;
@@ -1530,6 +1638,7 @@ var Custom = (function () {
     study.visMode = modes[(modes.indexOf(was) + 1) % modes.length];
     store('studyVis', study.visMode);
     if (was === 'off' && study.current && study.current.url) playSound(study.current);   // to ask for it with CORS this time
+    if (study.visMode === 'off') tapStop();
     visStart();
   }
 
@@ -1539,6 +1648,7 @@ var Custom = (function () {
     var text = (snd.url || snd.noise ? '♪ ' : '') + snd.name;
     if (study.failed) text += '  ·  couldn’t play this one, try another';
     else if (isSaved(snd)) text += '  ·  ★';
+    if (study.tap && study.tap.ok && study.tap.url === snd.url) text += '  ·  visuals in sync';
     s.querySelector('.music').textContent = text;
   }
 
@@ -1561,7 +1671,7 @@ var Custom = (function () {
     study = {focus: true, length: FOCUS_MIN * 60, start: Date.now(), paused: false, pausedAt: 0, done: 0, timer: 0,
       audio: null, noise: null, ctx: null, watch: 0, current: null, failed: false, picker: null,
       visMode: visModes().indexOf(vm) >= 0 ? vm : visModes()[0], analyser: null, synced: false, noCors: {}, raf: 0,
-      mkViz: null, mkRaf: 0, mkFed: null, mkName: '', mkAt: 0, groove: null,
+      mkViz: null, mkRaf: 0, mkFed: null, mkName: '', mkAt: 0, groove: null, tap: null, noTap: {},
       freq: new Uint8Array(256), wave: new Uint8Array(512), peaks: []};
     playSound(stored('studyNow') || savedSounds()[0] || SILENCE);
     visStart();
@@ -1595,9 +1705,10 @@ var Custom = (function () {
 
   // MARK: the picker (a panel on the right; the timer slides left and keeps counting)
 
-  function fetchGenre(g, done) {
-    if (genreCache[g.tag]) return done(genreCache[g.tag]);
-    var path = '/json/stations/search?tag=' + encodeURIComponent(g.tag) + '&order=votes&reverse=true&hidebroken=true&limit=100', i = 0;
+  /** A Radio Browser call, trying the mirrors in turn; null when none answers. */
+  function rbGet(path, done) {
+    if (genreCache[path]) return done(genreCache[path]);
+    var i = 0;
     (function next() {
       if (i >= RB_MIRRORS.length) return done(null);
       var x = new XMLHttpRequest(), over = false, again = function () { if (!over) { over = true; next(); } };
@@ -1609,16 +1720,8 @@ var Custom = (function () {
           var raw;
           try { raw = JSON.parse(x.responseText); } catch (e) { return again(); }
           over = true;
-          var out = [], seen = {};
-          for (var k = 0; k < raw.length && out.length < 40; k++) {
-            var r = raw[k], codec = String(r.codec || '').toUpperCase(), name = String(r.name || '').replace(/\s+/g, ' ').trim();
-            if (!r.url_resolved || !name || !/^(MP3|AAC|AAC\+)$/.test(codec) || seen[name.toLowerCase()]) continue;
-            seen[name.toLowerCase()] = true;
-            out.push({name: name.length > 46 ? name.slice(0, 45) + '…' : name, url: r.url_resolved,
-              meta: [r.countrycode, r.bitrate ? r.bitrate + ' kbps' : ''].filter(function (v) { return v; }).join(' · ')});
-          }
-          genreCache[g.tag] = out;
-          done(out);
+          genreCache[path] = raw;
+          done(raw);
         };
         x.onerror = x.ontimeout = again;
         x.send();
@@ -1626,8 +1729,40 @@ var Custom = (function () {
     })();
   }
 
+  function cap(t) { return String(t).replace(/(^|[\s-])([a-z])/g, function (m, a, b) { return a + b.toUpperCase(); }); }
+
+  /** The stations of a tag, a country or a language: playable ones only (MP3, AAC), most voted first, no repeats. */
+  function stationsFrom(raw) {
+    var out = [], seen = {};
+    for (var k = 0; k < (raw || []).length && out.length < 80; k++) {
+      var r = raw[k], codec = String(r.codec || '').toUpperCase(), name = String(r.name || '').replace(/\s+/g, ' ').trim();
+      if (!r.url_resolved || !name || !/^(MP3|AAC|AAC\+)$/.test(codec) || seen[name.toLowerCase()]) continue;
+      seen[name.toLowerCase()] = true;
+      out.push({name: name.length > 46 ? name.slice(0, 45) + '…' : name, url: r.url_resolved,
+        meta: [r.countrycode, r.bitrate ? r.bitrate + ' kbps' : ''].filter(function (v) { return v; }).join(' · ')});
+    }
+    return out;
+  }
+
+  /** A list page: genres, countries or languages, the pinned ones first, then the rest by how many stations they have. */
+  function listFrom(kind, raw) {
+    var pins = kind === 'tags' ? PIN_TAGS : kind === 'countries' ? PIN_COUNTRIES : PIN_LANGUAGES, first = [], rest = [], i, r;
+    for (i = 0; i < (raw || []).length; i++) {
+      r = raw[i];
+      var n = r.stationcount || 0, key = kind === 'countries' ? r.iso_3166_1 : r.name;
+      if (!key || n < (kind === 'tags' ? 15 : 3) || (kind === 'tags' && !/[a-z]{3}/i.test(key))) continue;
+      var it = {name: kind === 'countries' ? r.name : cap(r.name), meta: n + ' stations',
+        q: (kind === 'tags' ? 'tag=' : kind === 'countries' ? 'countrycode=' : 'language=') + encodeURIComponent(key) +
+          (kind === 'countries' ? '' : '&tagExact=true') + '&order=votes&reverse=true'};
+      if (kind === 'languages') it.q = 'language=' + encodeURIComponent(key) + '&languageExact=true&order=votes&reverse=true';
+      var at = pins.indexOf(kind === 'countries' ? key : String(key).toLowerCase());
+      if (at >= 0) first[at] = it; else rest.push(it);
+    }
+    return first.filter(function (v) { return v; }).concat(rest);
+  }
+
   function openPicker() {
-    study.picker = {level: 'genres', genre: null, items: STUDY_GENRES, sel: 0, note: ''};
+    study.picker = {stack: [{title: 'Sounds', items: STUDY_GENRES, sel: 0, note: ''}]};
     setClass($('study'), 'picking', true);
     renderPicker();
   }
@@ -1635,23 +1770,22 @@ var Custom = (function () {
     study.picker = null;
     setClass($('study'), 'picking', false);
   }
+  function view() { var st = study.picker.stack; return st[st.length - 1]; }
 
-  function openGenre(g) {
-    var pk = study.picker;
-    pk.level = 'stations';
-    pk.genre = g;
-    pk.sel = 0;
-    pk.note = '';
-    if (g.saved) { pk.items = savedSounds(); if (!pk.items.length) pk.note = 'Nothing saved yet. OK twice on a station saves it.'; }
-    else if (g.noise) pk.items = NOISES;
-    else {
-      pk.items = [];
-      pk.note = 'Finding stations…';
-      fetchGenre(g, function (list) {
-        if (!study || study.picker !== pk || pk.genre !== g) return;
-        pk.items = list || [];
-        pk.note = list === null ? 'Couldn’t reach the station directory. Your saved sounds still play.' :
-          (list.length ? '' : 'No stations found here right now.');
+  /** Opens a row that leads somewhere: saved, noise, a list, or a list's stations. */
+  function openItem(it) {
+    var v = {title: it.name, items: [], sel: 0, note: '', stations: !it.list};
+    study.picker.stack.push(v);
+    var path = it.list ? '/json/' + it.list + '?order=stationcount&reverse=true&hidebroken=true' + (it.list === 'countries' ? '' : '&limit=400') :
+      it.q ? '/json/stations/search?' + it.q + '&hidebroken=true&limit=150' : '';
+    if (it.saved) { v.items = savedSounds(); if (!v.items.length) v.note = 'Nothing saved yet. OK twice on a station saves it.'; }
+    else if (it.noise) v.items = NOISES;
+    else if (path) {
+      v.note = 'Finding stations…';
+      rbGet(path, function (raw) {
+        if (!study || !study.picker || view() !== v) return;
+        v.items = raw === null ? [] : it.list ? listFrom(it.list, raw) : stationsFrom(raw);
+        v.note = raw === null ? 'Couldn’t reach the station directory. Your saved sounds still play.' : (v.items.length ? '' : 'Nothing playable here right now.');
         renderPicker();
       });
     }
@@ -1662,36 +1796,41 @@ var Custom = (function () {
   function renderPicker() {
     var pk = study && study.picker, box = $('study') && $('study').querySelector('.picker');
     if (!pk || !box) return;
+    var v = view(), top = pk.stack.length === 1;
     box.innerHTML = '';
-    el('div', 'ttl', box, pk.level === 'genres' ? 'Sounds' : '‹  ' + pk.genre.name);
-    var first = Math.max(0, Math.min(pk.sel - Math.floor(PICKER_ROWS / 2), pk.items.length - PICKER_ROWS)), cur = study.current && soundId(study.current);
-    for (var i = first; i < Math.min(pk.items.length, first + PICKER_ROWS); i++) {
-      var it = pk.items[i], row = el('div', 'row' + (i === pk.sel ? ' sel' : ''), box);
-      var mark = pk.level === 'stations' ? (soundId(it) === cur ? '▶  ' : '') + (isSaved(it) ? '★  ' : '') : '';
+    el('div', 'ttl', box, (top ? '' : '‹  ') + v.title + (v.items.length > PICKER_ROWS ? '   ' + (v.sel + 1) + ' / ' + v.items.length : ''));
+    var first = Math.max(0, Math.min(v.sel - Math.floor(PICKER_ROWS / 2), v.items.length - PICKER_ROWS)), cur = study.current && soundId(study.current);
+    for (var i = first; i < Math.min(v.items.length, first + PICKER_ROWS); i++) {
+      var it = v.items[i], row = el('div', 'row' + (i === v.sel ? ' sel' : ''), box);
+      var mark = v.stations ? (soundId(it) === cur ? '▶  ' : '') + (isSaved(it) ? '★  ' : '') : '';
       el('span', '', row, mark + (it.visuals ? 'Visuals · ' + VIS_NAMES[study.visMode] : it.name));
       if (it.visuals) el('span', 'm', row, 'OK to change');
       else if (it.nextLook) el('span', 'm', row, !mkSupported() ? 'needs WebGL 2, not on this TV' : (study.visMode === 'milkdrop' && study.mkName ? study.mkName.slice(0, 34) : ''));
       else if (it.meta) el('span', 'm', row, it.meta);
     }
-    if (pk.note) el('div', 'note', box, pk.note);
-    el('div', 'ph', box, pk.level === 'genres' ? 'OK to open  ·  ← or Back to close' :
+    if (v.note) el('div', 'note', box, v.note);
+    el('div', 'ph', box, !v.stations ? 'OK to open  ·  ← or Back to ' + (top ? 'close' : 'go back') :
       'OK to play  ·  OK again to save or unsave ★  ·  ← back');
   }
 
   function pickerKey(k, keys) {
-    var pk = study.picker;
+    var v = view(), n = v.items.length;
     if (k === keys.back || k === 27 || k === 8 || k === keys.left) {
-      if (pk.level === 'stations') { pk.level = 'genres'; pk.items = STUDY_GENRES; pk.sel = Math.max(0, STUDY_GENRES.indexOf(pk.genre)); pk.note = ''; renderPicker(); }
-      else closePicker();
+      if (study.picker.stack.length > 1) { study.picker.stack.pop(); renderPicker(); } else closePicker();
       return true;
     }
     if (k === keys.up || k === keys.down) {
-      if (pk.items.length) pk.sel = (pk.sel + (k === keys.up ? pk.items.length - 1 : 1)) % pk.items.length;
+      if (n) v.sel = (v.sel + (k === keys.up ? n - 1 : 1)) % n;
+      renderPicker();
+      return true;
+    }
+    if (k === 33 || k === 34) {   // channel or page up and down: a page at a time through long lists
+      if (n) v.sel = Math.max(0, Math.min(n - 1, v.sel + (k === 33 ? -PICKER_ROWS : PICKER_ROWS)));
       renderPicker();
       return true;
     }
     if (k === keys.ok || k === keys.right) {
-      var it = pk.items[pk.sel];
+      var it = v.items[v.sel];
       if (!it) return true;
       if (it.visuals) { visStep(); renderPicker(); }
       else if (it.nextLook) {
@@ -1701,7 +1840,7 @@ var Custom = (function () {
         }
         setTimeout(renderPicker, 50);
       }
-      else if (pk.level === 'genres') openGenre(it);
+      else if (!v.stations) openItem(it);
       else if (k === keys.ok && study.current && soundId(it) === soundId(study.current)) {
         var on = toggleSaved(it);
         if (hooks.toast) hooks.toast(on ? 'Saved · ↑ ↓ in Study reaches it' : 'Removed from saved');
