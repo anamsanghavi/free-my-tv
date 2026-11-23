@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Scene pack
         run: python3 webos/get_scenes.py
-      - name: Build (generic: the TV's time zone picks the city until one is chosen on the TV)
+      - name: "Build (generic: the TV's time zone picks the city until one is chosen on the TV)"
         run: python3 webos/build.py --generic
       - name: Release
         env:
