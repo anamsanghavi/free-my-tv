@@ -352,7 +352,9 @@
       var bg = 'rgb(' + logo.bg.join(',') + ')';
       var hex = '#' + ((1 << 24) | (logo.bg[0] << 16) | (logo.bg[1] << 8) | logo.bg[2]).toString(16).slice(1);
       paint(box, bg, darken(hex, 0.93));
+      return hex;   // Local addition: the tile's real colour, for the colour order
     }
+    return '';
   }
 
   /** An app's face: its logo on its brand color (or its name, when the icon can't be read). */
@@ -361,18 +363,20 @@
     var top = k ? k[3][0] : app.color ? darken(app.color, 0.92) : '#2A2A2E';
     var bottom = k ? k[3][1] : app.color ? darken(app.color, 0.62) : '#161618';
     paint(box, top, bottom);
+    if (!app._col) app._col = top;   // Local addition: the colour the shelf is ordered by
+    function shown(c) { if (c && c !== app._col) { app._col = c; colourSettled(); } }
     var word = el('div', 'word', box, I18N.name(app.title));
     if (wordSize) word.style.fontSize = wordSize + 'px';
     if (app.icon) {
       var img = el('img', '', box), url = app.icon;
       word.style.visibility = 'hidden';
       img.onerror = function () { if (img.parentNode) img.parentNode.removeChild(img); word.style.visibility = ''; };
-      if (lifted[url]) { showLogo(img, box, top, bottom, lifted[url], !k); return; }
+      if (lifted[url]) { shown(showLogo(img, box, top, bottom, lifted[url], !k)); return; }
       if (lifted[url] !== false) {
         img.onload = function () {
           img.onload = null;
           if (lifted[url] === undefined) lifted[url] = lift(img);
-          if (lifted[url]) showLogo(img, box, top, bottom, lifted[url], !k);
+          if (lifted[url]) shown(showLogo(img, box, top, bottom, lifted[url], !k));
         };
       }
       img.src = url;
@@ -383,6 +387,43 @@
 
   /** shelf_apps in config.properties: the shelf in that order, by id or name (part of it). */
   var WANTED = (CONFIG.shelfApps || []).map(function (s) { return s.toLowerCase(); });
+
+  /**
+   * Local addition: the shelf sorted so its colours flow: the near-black ones first (darkest first), then by hue from blue
+   * through purple, red and orange to green. Colours within about 45 degrees of each other go darker first.
+   */
+  function byColour(list) {
+    function info(app, i) {
+      var k = shelfKey(app), c = rgbOf(app._col || (k ? k[3][0] : app.color || '#2A2A2E'));
+      var r = c[0] / 255, g = c[1] / 255, b = c[2] / 255, max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, h = 0;
+      if (d) h = max === r ? 60 * (((g - b) / d) % 6) : max === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+      if (h < 0) h += 360;
+      var light = (max + min) / 2, sat = d ? d / (1 - Math.abs(2 * light - 1)) : 0;
+      var dark = light < 0.16 || sat < 0.2;
+      return {app: app, i: i, dark: dark, bin: dark ? (light > 0.6 ? 99 : -1) : Math.floor(((h - 190 + 360) % 360) / 45), light: light};
+    }
+    return list.map(info).sort(function (a, b) {
+      if (a.bin !== b.bin) return a.bin - b.bin;
+      if (Math.abs(a.light - b.light) > 0.03) return a.light - b.light;
+      return a.i - b.i;
+    }).map(function (x) { return x.app; });
+  }
+
+  /** Local addition: once the logos show the tiles' real colours, the shelf takes its colour order again. */
+  var colourTimer = 0;
+  function colourSettled() {
+    clearTimeout(colourTimer);
+    colourTimer = setTimeout(function () {
+      var sorted = byColour(shelf), same = true;
+      for (var i = 0; i < sorted.length; i++) if (sorted[i] !== shelf[i]) same = false;
+      if (same) return;
+      var focused = shelf[st.shelf];
+      shelf = sorted;
+      st.shelf = Math.max(0, shelf.indexOf(focused));
+      renderShelf();
+      updateFocus();
+    }, 400);
+  }
 
   function pickShelf() {
     if (WANTED.length && Prefs.shelfConfig() !== WANTED.join(',')) {
@@ -410,7 +451,7 @@
       }
       if (!out.length) out = apps.slice(0, FEW_APPS);
     }
-    shelf = out;
+    shelf = byColour(out);   // Local addition: the shelf in colour order
     others = apps.filter(function (x) { return shelf.indexOf(x) < 0; });
   }
 
@@ -418,7 +459,13 @@
 
   var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang', CITY: 'city', KEY: 'key', ABOUT: 'about'};
   var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0, city: 0, key: 0};
+  // Local addition: the editorial layout. The home screen rests on the diorama with a big clock; any key opens the menu,
+  // a column on the left: the clock, the apps as a list, then the modes and shortcuts. Back, or a quiet minute, rests again.
+  var ED = !!window.Custom, menuOn = false, menuFirst = 0, MENU_ROWS = 6;
   var cards = [];
+
+  /** Local addition: the picks only when Custom leaves them on. */
+  function picksOn() { return Data.hasKey() && !(window.Custom && Custom.hidePicks); }
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG || st.zone === Z.CITY || st.zone === Z.KEY || st.zone === Z.ABOUT; }
 
@@ -442,8 +489,10 @@
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.DRAWER && st.drawer === i);
     list = document.querySelectorAll('#apps .cell');
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.APPS && st.grid === i);
-    var rows = Math.max(1, Math.ceil(others.length / 5)), r = Math.floor(st.grid / 5), first = Math.max(0, Math.min(rows - 3, r - 1));
-    $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * 239) + 'px)';
+    var rows = Math.max(1, Math.ceil(others.length / 5)), r = Math.floor(st.grid / 5), shownRows = ED ? 6 : 3;
+    var first = Math.max(0, Math.min(rows - shownRows, r - (ED ? 2 : 1)));
+    $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * (ED ? 92 : 239)) + 'px)';
+    if (ED) for (i = 0; i < list.length; i++) list[i].style.visibility = Math.floor(i / 5) >= first && Math.floor(i / 5) < first + shownRows ? '' : 'hidden';
     focusRows($('settings'), st.row, st.zone === Z.SETTINGS);
     focusRows($('shelfedit'), st.edit, st.zone === Z.EDIT);
     focusRows($('langpick'), st.lang, st.zone === Z.LANG);
@@ -451,6 +500,8 @@
     focusRows($('citypick'), st.city, st.zone === Z.CITY);
     focusRows($('keypick'), st.key, st.zone === Z.KEY);
     setClass(body, 'drawer-open', st.zone === Z.DRAWER);
+    menuFocus();   // Local addition
+    setClass(body, 'sheet-open', sheetOpen());   // Local addition: the menu steps back under a sheet
     followSoon();
   }
 
@@ -517,10 +568,10 @@
   // MARK: - Picks and background
 
   function renderCards() {
-    var list = Data.picks(TAB_KIND[st.tab]);
+    var list = picksOn() ? Data.picks(TAB_KIND[st.tab]) : [];   // Local addition: picks off
     var holder = $('cards');
     setClass(body, 'no-picks', !list.length);
-    setClass(body, 'no-key', !Data.hasKey());   // as on Android: no title or tabs that could never show anything
+    setClass(body, 'no-key', !picksOn());   // as on Android: no title or tabs that could never show anything
     if (!Data.hasKey() && st.zone === Z.TOP && st.top < 3) st.top = 3;
     var same = list.length === cards.length;
     for (var i = 0; same && i < list.length; i++) same = list[i].id === cards[i].id && list[i].backdrop === cards[i].backdrop && list[i].meta === cards[i].meta;
@@ -605,6 +656,117 @@
     var d = new Date(), c = $('clock');
     c.firstChild.textContent = formatDate('format|h:mm', d.getTime());
     c.lastChild.textContent = formatDate('format|EEEE, MMMM d', d.getTime());
+    renderMenuClock();   // Local addition
+  }
+
+  // MARK: - Local addition: the editorial home screen (resting clock) and menu (the column on the left)
+
+  function wxWords(sep, lower) {
+    var w = Data.weather;
+    if (!w) return '';
+    var c = Data.condition(w.code, w.isDay);
+    return Data.degrees(w.temp) + sep + (lower ? c.toLowerCase() : c);
+  }
+
+  function renderMenuClock() {
+    if (!ED || !$('rest')) return;
+    var now = Date.now(), r = $('rest'), m = $('menu');
+    r.children[0].textContent = formatDate('format|EEEE, MMMM d', now);
+    var wxNow = wxWords(' ', false);
+    if (wxNow) el('span', 'dwx', r.children[0], wxNow);   // the weather on the date's line, after a dot (custom.css)
+    r.children[1].textContent = formatDate('format|h:mm', now);
+    r.children[2].textContent = '';
+    var mc = m.querySelector('.mclock');
+    mc.children[0].textContent = formatDate('format|h:mm', now);
+    var wx = wxWords(', ', true);
+    mc.children[1].textContent = formatDate('format|EEEE', now) + (wx ? ' \u00B7 ' + wx : '');
+  }
+
+  function renderMenu() {
+    if (!ED) return;
+    var stage = $('stage'), r = $('rest'), m = $('menu');
+    if (!r) {
+      r = document.createElement('div');
+      r.id = 'rest';
+      r.className = 'layer';
+      el('div', 'date', r);
+      el('div', 'time', r);
+      el('div', 'wx', r);
+      stage.insertBefore(r, $('drawer'));
+      m = document.createElement('div');
+      m.id = 'menu';
+      m.className = 'layer';
+      el('div', 'fade', m);
+      var col = el('div', 'col', m), mc = el('div', 'mclock', col);
+      el('div', 't', mc);
+      el('div', 's', mc);
+      el('div', 'mapps', col);
+      el('div', 'mmodes', col);
+      stage.insertBefore(m, $('drawer'));
+    }
+    var apps = m.querySelector('.mapps'), modes = m.querySelector('.mmodes'), i;
+    apps.innerHTML = '';
+    for (i = 0; i < shelf.length; i++) {
+      var row = el('div', 'mi', apps);
+      el('span', 'n', row, I18N.name(shelf[i].title));
+      el('span', 'go', row, 'open \u2192');
+      hover(row, Z.SHELF, i);
+    }
+    modes.innerHTML = '';
+    for (i = 0; i < drawerItems.length; i++) {
+      var item = drawerItems[i];
+      if (i) el('span', 'sep', modes, ' \u00B7 ');
+      var md = el('span', 'md' + (item.on ? ' on' : '') + (item.off ? ' off' : ''), modes, I18N.name(item.label));
+      hover(md, Z.DRAWER, i);
+    }
+    renderMenuClock();
+    menuFocus();
+  }
+
+  function menuFocus() {
+    if (!ED || !$('menu')) return;
+    var rows = $('menu').querySelectorAll('.mi'), mds = $('menu').querySelectorAll('.md'), i;
+    if (st.shelf < menuFirst) menuFirst = st.shelf;
+    if (st.shelf >= menuFirst + MENU_ROWS) menuFirst = st.shelf - MENU_ROWS + 1;
+    menuFirst = Math.max(0, Math.min(menuFirst, rows.length - MENU_ROWS));
+    for (i = 0; i < rows.length; i++) {
+      setClass(rows[i], 'focus', menuOn && st.zone === Z.SHELF && st.shelf === i);
+      rows[i].style.display = i >= menuFirst && i < menuFirst + MENU_ROWS ? '' : 'none';
+    }
+    var apps = $('menu').querySelector('.mapps');
+    setClass(apps, 'more-up', menuFirst > 0);
+    setClass(apps, 'more-down', menuFirst + MENU_ROWS < rows.length);
+    for (i = 0; i < mds.length; i++) setClass(mds[i], 'focus', menuOn && st.zone === Z.DRAWER && st.drawer === i);
+  }
+
+  function wakeMenu() {
+    menuOn = true;
+    menuFirst = 0;
+    if (shelf.length) { st.zone = Z.SHELF; st.shelf = 0; }
+    else { st.zone = Z.DRAWER; st.drawer = 0; }
+    setClass(body, 'menu-on', true);
+    renderMenuClock();
+    updateFocus();
+  }
+
+  function restMenu() {
+    if (!menuOn) return;
+    menuOn = false;
+    st.zone = Z.SHELF;
+    setClass(body, 'menu-on', false);
+    updateFocus();
+  }
+
+  /** In the menu: ↑ ↓ through the apps, on down into the modes line, where ← → move along it and ↑ goes back up. */
+  function menuMove(dx, dy) {
+    if (st.zone === Z.SHELF) {
+      if (dy > 0 && st.shelf >= shelf.length - 1) { if (drawerItems.length) st.zone = Z.DRAWER; }
+      else if (dy) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dy));
+    } else {
+      if (dx) st.drawer = Math.max(0, Math.min(drawerItems.length - 1, st.drawer + dx));
+      else if (dy < 0 && shelf.length) { st.zone = Z.SHELF; st.shelf = shelf.length - 1; }
+    }
+    updateFocus();
   }
 
   /** On the minute, so the clock never runs late (the 30-second refresh could, by up to 30 s). */
@@ -620,7 +782,9 @@
   function renderShelf() {
     var n = Math.min(shelf.length, SHELF_VISIBLE), gap = 48, pad = 40;
     // 16:9 tiles, as on Android: never taller than 126, and the glass keeps its bottom edge.
-    var tw = Math.min(126 * 16 / 9, (1760 - Math.max(0, n - 1) * gap) / Math.max(1, n)), th = tw * 9 / 16;
+    // Local addition: tall 2:3 poster cards instead of 16:9 tiles
+    gap = 40;
+    var tw = Math.min(172, (1760 - Math.max(0, n - 1) * gap) / Math.max(1, n)), th = tw * 3 / 2;
     var width = n * tw + Math.max(0, n - 1) * gap, left = (1920 - width) / 2;
     var platter = $('platter');
     platter.style.display = n ? '' : 'none';
@@ -653,6 +817,7 @@
     }
     st.shelf = Math.min(st.shelf, Math.max(0, shelf.length - 1));
     placeTiles();
+    renderMenu();   // Local addition
   }
 
   /** The row slides (a transform on #tiles, which old TVs animate), and the apps it takes past the glass fade out. */
@@ -693,11 +858,13 @@
       drawerItems.push({label: x.label || tr('Live TV'), symbol: x.symbol, off: !x.connected, run: launcher(x.id, x.label)});
     }
     drawerInputs = drawerItems.length;
+    if (window.Custom) drawerItems = drawerItems.concat(Custom.modes());   // Local addition: the modes
     drawerItems.push({label: tr('All Apps'), symbol: 'apps', run: openApps});
-    drawerItems.push({label: tr('Home Settings'), symbol: 'settings', run: openSettings});
+    drawerItems.push({label: window.Custom ? 'Settings' : tr('Home Settings'), symbol: 'settings', run: openSettings});   // Local addition: short enough to fit
     if (TV.canOpenSettings) drawerItems.push({label: tr('TV Settings'), symbol: 'tv_settings', run: tvSettings});
     var n = drawerItems.length, gap = 18, groupGap = 56, groups = drawerInputs > 0 && drawerInputs < n ? 2 : 1;
     var tw = Math.min(230, (1760 - Math.max(0, n - groups) * gap - (groups - 1) * groupGap) / Math.max(1, n));
+    d.className = d.className.replace(/ ?\btight\b/g, '') + (tw < 150 ? ' tight' : '');   // Local addition: many keys, narrower keys, smaller labels (custom.css)
     var xPos = 80;
     for (var k = 0; k < n; k++) {
       if (k === drawerInputs && k > 0) {
@@ -705,7 +872,7 @@
         startAt(el('div', 'row-title', d, tr('Shortcuts')), xPos + 4);
       }
       if (k === 0 && drawerInputs) startAt(el('div', 'row-title', d, tr('Inputs')), 84);
-      var item = drawerItems[k], key = el('div', 'key glass' + (item.off ? ' off' : ''), d);
+      var item = drawerItems[k], key = el('div', 'key glass' + (item.off ? ' off' : '') + (item.on ? ' mode-on' : ''), d);
       startAt(key, xPos);
       key.style.width = tw + 'px';
       sym(item.symbol, key);
@@ -714,14 +881,16 @@
       xPos += tw + gap;
     }
     renderPanels();
+    renderMenu();   // Local addition
     updateFocus();
   }
 
   function renderPanels() {
+    renderMenuClock();   // Local addition: the weather words under the clocks
     var d = $('drawer');
     var old = d.querySelectorAll('.panel');
     for (var o = 0; o < old.length; o++) d.removeChild(old[o]);
-    var wx = Prefs.weather(), coins = Data.activeCoins(), qt = coins.length > 0;
+    var wx = Prefs.weather(), coins = Data.activeCoins(), film = !!(window.Custom && Custom.filmOn()), qt = coins.length > 0 || film;
     var split = 80 + 1760 * 0.585;
     if (wx) {
       var w = el('div', 'panel glass', d);
@@ -732,11 +901,11 @@
     }
     if (qt) {
       var q = el('div', 'panel glass', d);
-      q.id = 'prices';
+      q.id = coins.length ? 'prices' : 'film';
       var left = wx ? split + 16 : 80;
       startAt(q, left);
       q.style.width = (1840 - left) + 'px';
-      renderPrices(q, coins);
+      if (coins.length) renderPrices(q, coins); else Custom.renderFilm(q);   // Local addition: film of the day
     }
   }
 
@@ -847,11 +1016,12 @@
     var sheet = $('apps');
     sheet.firstChild.textContent = tr('All Apps');
     var grid = sheet.lastChild;
+    if (ED && !sheet.querySelector('.foot')) sheet.insertBefore(el('div', 'foot', null, 'OK opens  \u00B7  Back to the menu'), grid);   // Local addition
     grid.innerHTML = '';
     for (var i = 0; i < others.length; i++) {
       var r = Math.floor(i / 5), c = i % 5, cell = el('div', 'cell', grid);
-      startAt(cell, 130 + c * 340);
-      cell.style.top = (196 + r * 239) + 'px';
+      startAt(cell, ED ? 120 + c * 336 : 130 + c * 340);   // Local addition: a list of names, five across
+      cell.style.top = (ED ? 300 + r * 92 : 196 + r * 239) + 'px';
       face(others[i], el('div', 'face', cell), wordFit(others[i].title, 300, 34));
       el('div', 'label', cell, I18N.name(others[i].title));
       hover(cell, Z.APPS, i);
@@ -903,6 +1073,14 @@
         }},
       {label: tr('Dim'), value: dimName(),
         step: function (d) { cycle('dim', ['off', 'low', 'medium', 'high', 'auto'], Prefs.dim(), d); applyDim(); }},
+      {label: 'Weather effects', value: window.Custom ? Custom.fxLabel() : '',
+        step: function (d) { if (window.Custom) Custom.fxStep(d); }},   // Local addition
+      {label: 'Ambient sound', value: window.Custom ? Custom.soundLabel() : '',
+        step: function (d) { if (window.Custom) Custom.soundStep(d); }},   // Local addition
+      {label: 'Screensaver changes every', value: window.Custom ? Custom.saverLabel() : '',
+        step: function (d) { if (window.Custom) Custom.saverStep(d); }},   // Local addition
+      {label: 'Screensaver after dark', value: window.Custom ? Custom.skySaverLabel() : '',
+        step: function () { if (window.Custom) Custom.skySaverStep(); }},   // Local addition: tonight's sky or the photos
       {label: tr('Screensaver'), value: saverMode() === 'clock' ? tr('Clock') : tr('Photos'),
         step: function (d) { cycle('saver', ['photos', 'clock'], saverMode(), d); }},
       {label: tr('Picks per tab'), value: String(I18N.digits(Prefs.cards())),
@@ -1256,6 +1434,7 @@
       Prefs.set('tmdbKey', key);
       if (fieldOf('keypick')) fieldOf('keypick').value = '';
       Data.keyChanged();
+      if (window.Custom) Custom.keyChanged();   // Local addition
       setKeyStatus(tr('Saved. The picks arrive in a moment.'));
     });
   }
@@ -1265,6 +1444,7 @@
     Prefs.set('tmdbKey', undefined);   // left out of the saved settings
     closeKey();
     Data.keyChanged();
+    if (window.Custom) Custom.keyChanged();   // Local addition
   }
 
   /** Back on the TMDB key row of Home Settings. */
@@ -1612,13 +1792,14 @@
     // Mirrored, the screen's left is the way forward: ← goes to the next one, and in the shelf's and the inputs' editors
     // to a later place (the rows they order run from the right). Settings' values keep their arrows.
     if (rtl && (st.zone === Z.SHELF || st.zone === Z.CARDS || st.zone === Z.TOP || st.zone === Z.DRAWER || st.zone === Z.APPS || st.zone === Z.EDIT)) dx = -dx;
+    if (ED && (st.zone === Z.SHELF || st.zone === Z.DRAWER)) { menuMove(dx, dy); return; }   // Local addition
     switch (st.zone) {
       case Z.SHELF:
         if (dx) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dx));
         else if (dy > 0) { openDrawer(); return; }
         else if (dy < 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(tiles[st.shelf])); }
-          else { st.zone = Z.TOP; st.top = Data.hasKey() ? st.tab : 3; }
+          else { st.zone = Z.TOP; st.top = picksOn() ? st.tab : 3; }
         }
         break;
       case Z.CARDS:
@@ -1628,7 +1809,7 @@
         break;
       case Z.TOP:
         if (dx) {
-          st.top = Math.max(Data.hasKey() ? 0 : 3, Math.min(5, st.top + dx));   // without the picks the tabs can't hold focus
+          st.top = Math.max(picksOn() ? 0 : 3, Math.min(5, st.top + dx));   // without the picks the tabs can't hold focus
           if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
@@ -1683,6 +1864,7 @@
     if (st.zone === Z.KEY) { if (keyAsking) askRemoveKey(false); else closeKey(); return; }
     if (st.zone === Z.ABOUT) { closeAbout(); return; }
     if (sheetOpen()) { closeSheets(); return; }
+    if (ED && menuOn) { restMenu(); return; }   // Local addition: the menu goes, the diorama and its clock stay
     if (st.zone === Z.DRAWER) { closeDrawer(); return; }
     if (st.zone !== Z.SHELF && shelf.length) { st.zone = Z.SHELF; updateFocus(); return; }
     TV.back();
@@ -1692,7 +1874,7 @@
   function hover(node, zone, index) {
     node.onmouseover = function () {
       if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.LANG || zone === Z.CITY || zone === Z.KEY || zone === Z.ABOUT))) return;
-      if (zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
+      if (zone === Z.DRAWER && st.zone !== Z.DRAWER && !ED) return;   // Local addition: in the menu the modes line is always in reach
       if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
       if (zone === Z.TOP && index < 3 && !Data.hasKey()) return;   // the tabs are hidden without the picks
       if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
@@ -1728,8 +1910,9 @@
   var lastNight = null;
 
   function checkNight() {
-    var night = Data.isNight(Date.now());
+    var night = Data.isNight(Date.now()) || !!(window.Custom && Custom.movie());   // Local addition: movie night
     setClass(body, 'night', night);
+    if (window.Custom) Custom.nightChanged(night);
     if (night === lastNight) return;
     lastNight = night;
     document.documentElement.style.background = night ? '#0B0B0D' : '';
@@ -1762,11 +1945,17 @@
 
   /** The screensaver's photos: picks with an app on the TV. */
   function saverPhotos() {
+    if (window.Custom) return Custom.saverItems();   // Local addition: space photos only, never the picks' film photos
+    // Local addition: your own photos (myphotos.js, from webos/my_photos.py) take the picks' place when there are any.
+    if (window.MY_PHOTOS && window.MY_PHOTOS.length) return window.MY_PHOTOS.map(function (src) { return {mine: src}; });
     return Data.showcase().filter(function (p) { return p.backdrop && Data.usable(p.app); });
   }
 
   function showSaver() {
     var photos = saverPhotos();
+    if (photos.length && photos[0].mine) {   // shuffled each time the screensaver starts
+      for (var i = photos.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = photos[i]; photos[i] = photos[j]; photos[j] = t; }
+    }
     saverOn = true;
     saverPick = null;
     var s = $('saver');
@@ -1783,14 +1972,35 @@
       if (!saverOn) return;
       var p = photos.length ? photos[saverIndex++ % photos.length] : null;
       var back = front === a ? b : a;
-      if (p) {
+      if (p && p.img) {   // Local addition: a space photo and a film quote
+        back.style.backgroundImage = 'url("' + p.img + '")';
+        back.style.webkitTransform = back.style.transform = 'scale(1.0)';
+        var qt = clock.querySelector('.title');
+        qt.className = 'title quote' + (p.history ? ' history' : '');
+        qt.textContent = p.history ? p.quote : '\u201C' + p.quote + '\u201D';
+        if (p.en) el('em', 'en', qt, p.en);   // Local addition: a Hindi line's English
+        el('span', '', qt, p.film);
+        var credit = s.querySelector('.credit') || el('div', 'credit', s);   // the photo's name, bottom right
+        credit.innerHTML = '';
+        if (p.title) { el('b', '', credit, p.label || 'NASA'); credit.appendChild(document.createTextNode(p.title)); }
+        saverPick = null;
+        hint.textContent = '';
+      } else if (p && p.mine) {
+        back.style.backgroundImage = 'url(' + p.mine + ')';
+        back.style.webkitTransform = back.style.transform = 'scale(1.0)';
+        clock.querySelector('.title').textContent = '';
+        saverPick = null;
+        hint.textContent = '';
+      } else if (p) {
         back.style.backgroundImage = 'url(' + Data.image(p.backdrop, 'original') + ')';
         back.style.webkitTransform = back.style.transform = 'scale(1.0)';
-        clock.children[2].textContent = I18N.name(p.title);
+        clock.querySelector('.title').textContent = I18N.name(p.title);
         saverPick = p;
         // With Watch from the screensaver on, OK opens this title's app (any other key only closes).
         var target = Prefs.saverWatch() ? pickTarget(p) : null;
         hint.textContent = target ? trf('Press OK to watch on {app} · any other button to close', {app: I18N.name(target.app.title)}) : '';
+      }
+      if (p) {
         setTimeout(function () {
           setClass(back, 'on', true);
           setClass(front, 'on', false);
@@ -1799,16 +2009,27 @@
         }, 60);
       }
       tickSaverClock(clock);
-      saverTimer = setTimeout(next, 12000);
+      saverTimer = setTimeout(next, window.Custom ? Custom.saverSeconds() * 1000 : 12000);   // Local addition: your speed
     }
     setClass(s, 'on', true);
+    // Local addition: after dark, tonight's real sky instead of the photos (custom.js, skysaver.js), redrawn as it turns
+    if (window.Custom && Custom.skyNow && Custom.skyNow()) {
+      (function sky() {
+        if (!saverOn) return;
+        Custom.showSky(s, clock);
+        tickSaverClock(clock);
+        saverTimer = setTimeout(sky, Custom.skyEvery());
+      })();
+      return;
+    }
     next();
   }
 
   function tickSaverClock(clock) {
     var d = new Date();
-    clock.firstChild.textContent = formatDate('format|h:mm', d.getTime());
-    clock.children[1].textContent = formatDate('format|EEEE, MMMM d', d.getTime());
+    // by class, not position: the glass layer (custom.js) adds a child of its own
+    clock.querySelector('.time').textContent = formatDate('format|h:mm', d.getTime());
+    clock.querySelector('.date').textContent = formatDate('format|EEEE, MMMM d', d.getTime());
   }
 
   function hideSaver() {
@@ -1871,7 +2092,16 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    var mine = window.Custom && Custom.onKey(k, TV.keys);   // Local addition: the modes take their keys first
+    if (mine === 'type') { idleAt = Date.now(); return; }   // into a text field (Guest Wi-Fi): the keyboard has it
+    if (mine) { idleAt = Date.now(); e.preventDefault(); return; }
     if (poke(k === TV.keys.ok)) { e.preventDefault(); return; }   // the first press only wakes the screen (or OK watches)
+    // Local addition: resting on the diorama, the arrows and OK open the menu (and do nothing else)
+    if (ED && !menuOn && !sheetOpen() && (k === TV.keys.left || k === TV.keys.right || k === TV.keys.up || k === TV.keys.down || k === TV.keys.ok)) {
+      wakeMenu();
+      e.preventDefault();
+      return;
+    }
     if (typing(k)) return;
     if (k === TV.keys.left) move(-1, 0);
     else if (k === TV.keys.right) move(1, 0);
@@ -1947,6 +2177,7 @@
   }
 
   Data.onChange(function () {
+    if (window.fmtvMark) fmtvMark('new weather data');   // Local addition
     renderQuotes();
     renderCards();
     renderPanels();
@@ -1983,6 +2214,7 @@
     hideSaver();
     hideAmbient();
     if (document.hidden) return;
+    if (ED) restMenu();   // Local addition: back from an app, the diorama and its clock, not the menu left open
     idleAt = Date.now();
     TV.noteChannel();   // back from the viewer: the antenna channel it played, for Live TV
     if (TV.name === 'tizen') { renderClock(); checkNight(); applyDim(); }   // what resting() left as it was
@@ -1992,9 +2224,10 @@
   I18N.set(Prefs.language());
   direction();
   I18N.setClock(Prefs.clockFormat());
+  if (window.Custom) Custom.init({toast: toast, redraw: renderDrawer, panels: renderPanels, night: checkNight});   // Local addition
   checkNight();   // now, from the last forecast: not after the TV lists its apps, with the day look until then
   // LG's screensaver waits only when ours will show: not under a sheet (ours waits there), and not without photos.
-  TV.holdScreenSaver(function () { return !sheetOpen() && (saverMode() === 'clock' || saverPhotos().length > 0); });
+  TV.holdScreenSaver(function () { return (window.Custom && Custom.busy()) || !sheetOpen() && (saverMode() === 'clock' || !!window.Custom || saverPhotos().length > 0); });
   fit();
   renderTop();
   applyDim();
@@ -2006,19 +2239,27 @@
   });
   setInterval(function () {
     if (resting()) return;
+    if (window.fmtvMark) fmtvMark('30-second check');   // Local addition: named in the performance read-out
     checkNight();
     Data.refresh();
     applyDim();   // automatic: medium from 22:00, off again at 07:00
     // Only on screen: behind another app nobody presses our keys, so idleAt grows old and the screensaver would start
     // there, turning photos every 12 s for nothing while Netflix or YouTube plays.
-    if (!document.hidden && !saverOn && !ambientOn && !sheetOpen() && Date.now() - idleAt > SAVER_AFTER) {
-      if (saverMode() === 'clock') showAmbient(); else showSaver();
+    if (!document.hidden && !saverOn && !ambientOn && !sheetOpen() && !(window.Custom && Custom.busy()) && Date.now() - idleAt > SAVER_AFTER) {
+      // Local addition: without space photos yet, the drifting clock rather than film photos
+      if (saverMode() === 'clock' || (window.Custom && !Custom.saverItems().length)) showAmbient(); else showSaver();
     }
     if (saverOn) tickSaverClock($('saver').querySelector('.clock'));
     if (ambientOn) tickAmbient();
   }, 30000);
+  // Local addition: the menu closes itself after a quiet half minute, back to the diorama
+  setInterval(function () {
+    if (ED && menuOn && !sheetOpen() && !(window.Custom && Custom.busy()) && Date.now() - idleAt > 30000) restMenu();
+  }, 2000);
+  if (ED) setClass(document.documentElement, 'ed', true);
 
   // For the browser preview and tests.
   window.FreeMyTV = {state: st, move: move, activate: activate, back: back, showSaver: showSaver, hideSaver: hideSaver, toast: toast,
-    showAmbient: showAmbient, hideAmbient: hideAmbient, applyDim: applyDim};
+    showAmbient: showAmbient, hideAmbient: hideAmbient, applyDim: applyDim, wakeMenu: wakeMenu, restMenu: restMenu, openApps: openApps,
+    openSettings: openSettings, renderMenuClock: renderMenuClock};
 })();

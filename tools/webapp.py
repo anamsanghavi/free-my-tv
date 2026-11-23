@@ -68,6 +68,8 @@ def read_config(path):
         'hideServices': [s.strip().lower() for s in values.get('hide_services', '').split(',') if s.strip()],
         # Samsung: a pick opens its title's page in its app (Watchmode's free plan: 2,500 requests a month).
         'watchmodeKey': values.get('watchmode_key', '').strip(),
+        # Local addition: your own free api.nasa.gov key for the space photos (DEMO_KEY when empty).
+        'nasaKey': values.get('nasa_key', '').strip(),
         'shelfApps': [s.strip() for s in values.get('shelf_apps', '').split(',') if s.strip()],
         'drawerFirst': values.get('drawer_first', 'false').lower() == 'true',
         # Samsung: Home pressed in an app opened from here brings Free My TV back. It changes the package's manifest
