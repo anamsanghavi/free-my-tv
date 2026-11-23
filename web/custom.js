@@ -12,8 +12,10 @@ var Custom = (function () {
   'use strict';
 
   var NASA_KEY = String((window.CONFIG && CONFIG.nasaKey) || 'DEMO_KEY');
-  // Study's sounds: ↑ ↓ pick one, the choice is kept. SomaFM is listener-supported, no ads; the rain is the storm scene's own loop.
-  var STUDY_SOUNDS = [
+  // Study's sounds. ↑ ↓ switch between the saved ones; ← opens the picker: genres from Radio Browser, the open, community-run
+  // station directory (no key, no account), plus noise made right here. SomaFM is listener-supported, no ads.
+  var RB_MIRRORS = ['https://de1.api.radio-browser.info', 'https://nl1.api.radio-browser.info', 'https://at1.api.radio-browser.info'];
+  var STUDY_DEFAULT = [
     {name: 'Fluid · instrumental hip-hop', url: 'https://ice1.somafm.com/fluid-128-mp3'},
     {name: 'Groove Salad · chilled downtempo', url: 'https://ice1.somafm.com/groovesalad-128-mp3'},
     {name: 'Sonic Universe · modern jazz', url: 'https://ice1.somafm.com/sonicuniverse-128-mp3'},
@@ -21,8 +23,21 @@ var Custom = (function () {
     {name: 'Deep Space One · ambient', url: 'https://ice1.somafm.com/deepspaceone-128-mp3'},
     {name: 'Drone Zone · slow ambient', url: 'https://ice1.somafm.com/dronezone-128-mp3'},
     {name: 'Rain and distant thunder', url: 'sound-thunderstorm.ogg', loop: true},
-    {name: 'Silence', url: ''}
+    {name: 'Brown noise', noise: 'brown'}
   ];
+  var NOISES = [{name: 'Brown noise', noise: 'brown', meta: 'deep, like a far waterfall'},
+    {name: 'Pink noise', noise: 'pink', meta: 'soft, like steady rain'}, {name: 'White noise', noise: 'white', meta: 'bright, like a fan'}];
+  var STUDY_GENRES = [
+    {name: 'Visuals', visuals: true}, {name: 'Saved', saved: true}, {name: 'Lo-fi', tag: 'lofi'}, {name: 'Jazz', tag: 'jazz'}, {name: 'Classical', tag: 'classical'},
+    {name: 'Piano', tag: 'piano'}, {name: 'Ambient', tag: 'ambient'}, {name: 'Chillout', tag: 'chillout'},
+    {name: 'Indian classical', tag: 'indian classical'}, {name: 'Bollywood', tag: 'bollywood'}, {name: 'Ghazal', tag: 'ghazal'},
+    {name: 'Nature sounds', tag: 'nature'}, {name: 'Noise · works offline', noise: true}
+  ];
+  var SILENCE = {name: 'Silence'};
+  // the visuals: the old media-player kind, drawn small (480×270) and scaled up, so they're cheap and a bit pixelly on purpose
+  var VIS_MODES = ['tunnel', 'bars', 'scope', 'off'], VIS_NAMES = {tunnel: 'Tunnel', bars: 'Bars', scope: 'Scope', off: 'Off'};
+  var VIS_W = 480, VIS_H = 270;
+  var genreCache = {};
   var BOLLYWOOD_VIDEO = '_i0oA5YYf1Y';   // the YouTube video the Bollywood button plays
   var FOCUS_MIN = 25, BREAK_MIN = 5;
 
@@ -1101,7 +1116,7 @@ var Custom = (function () {
     for (var i = 0; i < 4; i++) dots += i < (study.done % 4) ? '●' : '○';
     s.querySelector('.dots').textContent = dots;
     setClass(s, 'paused', study.paused);
-    s.querySelector('.hint').textContent = (study.paused ? 'Paused · OK to carry on' : 'OK to pause') + '  ·  ↑ ↓ sound  ·  → skip  ·  Back to leave';
+    s.querySelector('.hint').textContent = (study.paused ? 'Paused · OK to carry on' : 'OK to pause') + '  ·  ↑ ↓ saved sounds  ·  ← more sounds  ·  → skip  ·  Back to leave';
     if (!study.paused && left === 0) { studyNext(); studyDraw(); }
   }
 
@@ -1114,70 +1129,405 @@ var Custom = (function () {
     chime();
   }
 
-  function playRadio() {
-    if (!study || !study.audio) return;
-    try { var p = study.audio.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+  function soundId(snd) { return snd.noise ? 'noise:' + snd.noise : (snd.url || ''); }
+  function savedSounds() { var v = stored('studySaved'); return v && v.length !== undefined ? v : STUDY_DEFAULT.slice(); }
+  function isSaved(snd) {
+    var id = soundId(snd), list = savedSounds();
+    for (var i = 0; i < list.length; i++) if (soundId(list[i]) === id) return true;
+    return false;
+  }
+  function toggleSaved(snd) {
+    var id = soundId(snd), list = savedSounds(), out = [], had = false;
+    for (var i = 0; i < list.length; i++) { if (soundId(list[i]) === id) had = true; else out.push(list[i]); }
+    if (!had) out.push({name: snd.name, url: snd.url, loop: snd.loop, noise: snd.noise});
+    store('studySaved', out);
+    return !had;
+  }
+
+  /** Noise made here: a few seconds of it, its ends cross-faded so the loop has no seam. */
+  function startNoise(kind) {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    try {
+      var ctx = study.ctx || (study.ctx = new Ctx()), rate = ctx.sampleRate, len = rate * 6, fade = Math.floor(rate * 0.5);
+      var raw = new Float32Array(len + fade), last = 0, b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (var i = 0; i < len + fade; i++) {
+        var w = Math.random() * 2 - 1;
+        if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; raw[i] = last * 3.5; }
+        else if (kind === 'pink') {
+          b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+          b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+          raw[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926;
+        } else raw[i] = w * 0.3;
+      }
+      var buf = ctx.createBuffer(1, len, rate), d = buf.getChannelData(0);
+      for (var j = 0; j < len; j++) d[j] = j < fade ? raw[j] * (j / fade) + raw[len + j] * (1 - j / fade) : raw[j];
+      var src = ctx.createBufferSource(), gain = ctx.createGain();
+      src.buffer = buf;
+      src.loop = true;
+      gain.gain.value = 0;
+      src.connect(gain);
+      gain.connect(visGraph() || ctx.destination);
+      src.start();
+      gain.gain.setTargetAtTime(0.55, ctx.currentTime, 0.6);
+      study.synced = true;
+      if (ctx.state === 'suspended' && !study.paused) ctx.resume();
+      study.noise = src;
+    } catch (e) {}
+  }
+
+  function stopSound() {
+    clearTimeout(study.watch);
+    if (study.audio) { try { study.audio.pause(); study.audio.removeAttribute('src'); study.audio.load(); } catch (e) {} }
+    if (study.noise) { try { study.noise.stop(); } catch (e) {} }
+    study.audio = study.noise = null;
+  }
+
+  function resumeSound() {
+    if (study.audio) { try { var p = study.audio.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+    if (study.ctx) { try { study.ctx.resume(); } catch (e) {} }
+  }
+  function pauseSound() {
+    if (study.audio) study.audio.pause();
+    if (study.ctx) { try { study.ctx.suspend(); } catch (e) {} }
+  }
+
+  /** Plays a sound; a stream that hasn't started in 10 s is called out on the music line instead of sitting there silent. */
+  function playSound(snd) {
+    stopSound();
+    study.current = snd;
+    study.failed = false;
+    study.synced = false;
+    store('studyNow', {name: snd.name, url: snd.url, loop: snd.loop, noise: snd.noise});
+    if (snd.noise) startNoise(snd.noise);
+    else if (snd.url) {
+      try {
+        // With the visuals on, the stream is asked for with CORS, so the analyser may read it; a station that refuses is
+        // played again without (the visuals then keep an approximate beat), and remembered for this session.
+        var a = new Audio(), started = false, cors = study.visMode !== 'off' && !study.noCors[snd.url], fail = function () {
+          if (study && study.audio === a && !started) { study.failed = true; musicLine(); }
+        };
+        a.loop = !!snd.loop;
+        a.volume = 0.6;
+        a.addEventListener('playing', function () { started = true; if (study && study.audio === a) { study.failed = false; musicLine(); } });
+        a.addEventListener('error', function () {
+          if (cors && study && study.audio === a && !started) { study.noCors[snd.url] = true; playSound(snd); }
+          else fail();
+        });
+        if (cors) {
+          a.crossOrigin = 'anonymous';
+          var an = visGraph();
+          if (an) { try { study.ctx.createMediaElementSource(a).connect(an); study.synced = true; } catch (e) {} }
+        }
+        a.src = snd.url;
+        study.audio = a;
+        if (!study.paused) resumeSound();
+        study.watch = setTimeout(fail, 10000);
+      } catch (e) { study.failed = true; }
+    }
+    musicLine();
+    if (study.picker) renderPicker();
+  }
+
+  /** The analyser everything plays through while the visuals are on. */
+  function visGraph() {
+    if (study.analyser) return study.analyser;
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    try {
+      var ctx = study.ctx || (study.ctx = new Ctx()), an = ctx.createAnalyser();
+      an.fftSize = 512;
+      an.smoothingTimeConstant = 0.78;
+      an.connect(ctx.destination);
+      if (!study.paused) ctx.resume();
+      study.analyser = an;
+      return an;
+    } catch (e) { return null; }
+  }
+
+  /** This frame's spectrum and waveform: the real ones, an approximate beat for a stream that can't be read, flat in silence. */
+  function visData(t) {
+    var f = study.freq, w = study.wave, i, snd = study.current || SILENCE;
+    if (study.paused || (!snd.url && !snd.noise) || study.failed) {
+      for (i = 0; i < f.length; i++) f[i] = f[i] * 0.9;
+      for (i = 0; i < w.length; i++) w[i] = 128 + (w[i] - 128) * 0.9;
+    } else if (study.synced && study.analyser) {
+      study.analyser.getByteFrequencyData(f);
+      study.analyser.getByteTimeDomainData(w);
+    } else {
+      var beat = Math.pow(Math.max(0, Math.sin(t * Math.PI * 1.5)), 8);
+      for (i = 0; i < f.length; i++) {
+        var x = i / f.length, wob = 0.5 + 0.5 * Math.sin(t * 3 + i * 0.3) * Math.sin(t * 1.7 + i * 0.11);
+        f[i] = Math.min(255, Math.pow(1 - x, 1.5) * 190 * (0.45 + 0.55 * wob) + beat * 110 * (1 - x));
+      }
+      for (i = 0; i < w.length; i++) w[i] = 128 + 55 * (0.4 + 0.6 * beat) * Math.sin(i * 0.08 + t * 6) * Math.sin(i * 0.013 + t);
+    }
+  }
+
+  function visDraw(g, c, t) {
+    visData(t);
+    var f = study.freq, w = study.wave, i, bass = 0, mode = study.visMode;
+    for (i = 0; i < 8; i++) bass += f[i];
+    bass /= 8 * 255;
+    if (mode === 'tunnel') {
+      // the picture fed back into itself, a little bigger and turned, with a ring of the waveform at the centre
+      g.save();
+      g.globalAlpha = 0.93;
+      g.translate(VIS_W / 2, VIS_H / 2);
+      g.rotate(0.01 + bass * 0.035);
+      var z = 1.03 + bass * 0.04;
+      g.scale(z, z);
+      g.drawImage(c, -VIS_W / 2, -VIS_H / 2);
+      g.restore();
+      g.fillStyle = 'rgba(0,0,0,0.07)';
+      g.fillRect(0, 0, VIS_W, VIS_H);
+      g.strokeStyle = 'hsl(' + Math.round(t * 45 + bass * 140) % 360 + ',100%,62%)';
+      g.lineWidth = 2;
+      g.beginPath();
+      var r = 26 + bass * 70, n = 96;
+      for (i = 0; i <= n; i++) {
+        var a = i / n * Math.PI * 2, rr = r + (w[(i * 5) % w.length] - 128) * 0.35;
+        var x = VIS_W / 2 + Math.cos(a) * rr, y = VIS_H / 2 + Math.sin(a) * rr;
+        if (i) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+      g.stroke();
+    } else if (mode === 'bars') {
+      g.fillStyle = 'rgba(0,0,0,0.4)';
+      g.fillRect(0, 0, VIS_W, VIS_H);
+      var bars = 40, bw = VIS_W / bars, floor = VIS_H * 0.74;
+      for (i = 0; i < bars; i++) {
+        var v = f[Math.floor(Math.pow(i / bars, 1.6) * 150)] / 255, h = v * VIS_H * 0.55;
+        study.peaks[i] = Math.max(h, (study.peaks[i] || 0) - 1.6);
+        g.fillStyle = 'hsl(' + Math.round(t * 25 + i * 7) % 360 + ',90%,56%)';
+        g.globalAlpha = 1;
+        g.fillRect(i * bw + 1, floor - h, bw - 2, h);
+        g.globalAlpha = 0.14;
+        g.fillRect(i * bw + 1, floor + 2, bw - 2, h * 0.4);
+        g.globalAlpha = 0.9;
+        g.fillStyle = '#F3EDE4';
+        g.fillRect(i * bw + 1, floor - study.peaks[i] - 3, bw - 2, 2);
+      }
+      g.globalAlpha = 1;
+    } else {
+      g.fillStyle = 'rgba(0,0,0,0.2)';
+      g.fillRect(0, 0, VIS_W, VIS_H);
+      g.lineWidth = 3;
+      for (var k = 0; k < 2; k++) {
+        g.strokeStyle = 'hsl(' + Math.round(t * 40 + k * 180) % 360 + ',100%,60%)';
+        g.globalAlpha = k ? 0.45 : 1;
+        g.beginPath();
+        for (i = 0; i < w.length; i += 2) {
+          var px = i / (w.length - 1) * VIS_W, py = VIS_H / 2 + (w[i] - 128) * (k ? -0.9 : 0.9) * (0.8 + bass);
+          if (i) g.lineTo(px, py); else g.moveTo(px, py);
+        }
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+    }
+  }
+
+  function visStart() {
+    var s = $('study'), c = s && s.querySelector('canvas.vis');
+    setClass(s, 'vis-on', study.visMode !== 'off');
+    if (!c || study.visMode === 'off' || study.raf) return;
+    var g = c.getContext('2d'), frame = 0, t0 = Date.now();
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, VIS_W, VIS_H);
+    (function loop() {
+      if (!study || study.visMode === 'off') { if (study) study.raf = 0; return; }
+      study.raf = requestAnimationFrame(loop);
+      if (++frame % 2) return;   // 30 frames a second is plenty for this
+      try { visDraw(g, c, (Date.now() - t0) / 1000); } catch (e) {}
+    })();
+  }
+
+  function visStep() {
+    var was = study.visMode;
+    study.visMode = VIS_MODES[(VIS_MODES.indexOf(was) + 1) % VIS_MODES.length];
+    store('studyVis', study.visMode);
+    if (was === 'off' && study.current && study.current.url) playSound(study.current);   // to ask for it with CORS this time
+    visStart();
+  }
+
+  function musicLine() {
+    var s = $('study'), snd = study.current;
+    if (!s || !snd) return;
+    var text = (snd.url || snd.noise ? '♪ ' : '') + snd.name;
+    if (study.failed) text += '  ·  couldn’t play this one, try another';
+    else if (isSaved(snd)) text += '  ·  ★';
+    s.querySelector('.music').textContent = text;
   }
 
   function startStudy() {
     var s = $('study');
     s.innerHTML = '';
+    var cv = el('canvas', 'vis', s);
+    cv.width = VIS_W;
+    cv.height = VIS_H;
     el('div', 'phase', s);
     el('div', 'time', s);
     el('div', 'dots', s);
     el('div', 'music', s);
     el('div', 'hint', s);
-    study = {focus: true, length: FOCUS_MIN * 60, start: Date.now(), paused: false, pausedAt: 0, done: 0, timer: 0, audio: null, pick: 0};
-    var kept = stored('studySound');
-    for (var i = 0; i < STUDY_SOUNDS.length; i++) if (STUDY_SOUNDS[i].name === kept) study.pick = i;
-    studySound();
+    el('div', 'picker', s);
+    var vm = stored('studyVis');
+    study = {focus: true, length: FOCUS_MIN * 60, start: Date.now(), paused: false, pausedAt: 0, done: 0, timer: 0,
+      audio: null, noise: null, ctx: null, watch: 0, current: null, failed: false, picker: null,
+      visMode: VIS_MODES.indexOf(vm) >= 0 ? vm : 'tunnel', analyser: null, synced: false, noCors: {}, raf: 0,
+      freq: new Uint8Array(256), wave: new Uint8Array(512), peaks: []};
+    playSound(stored('studyNow') || savedSounds()[0] || SILENCE);
+    visStart();
     setClass(s, 'on', true);
     overlayState();
     study.timer = setInterval(studyDraw, 500);
     studyDraw();
   }
 
-  /** Swaps to the picked sound: the old stream is let go first, so two never play at once. */
-  function studySound() {
-    var snd = STUDY_SOUNDS[study.pick], s = $('study');
-    if (study.audio) { try { study.audio.pause(); study.audio.removeAttribute('src'); study.audio.load(); } catch (e) {} }
-    study.audio = null;
-    if (snd.url) {
-      try {
-        study.audio = new Audio(snd.url);
-        study.audio.loop = !!snd.loop;
-        study.audio.volume = 0.6;
-        if (!study.paused) playRadio();
-      } catch (e) {}
-    }
-    if (s) s.querySelector('.music').textContent = (snd.url ? '♪ ' : '') + snd.name + '   ·   ' + (study.pick + 1) + ' of ' + STUDY_SOUNDS.length;
-  }
-
   function stopStudy() {
     if (!study) return;
     clearInterval(study.timer);
-    if (study.audio) { try { study.audio.pause(); study.audio.removeAttribute('src'); study.audio.load(); } catch (e) {} }
+    if (study.raf) cancelAnimationFrame(study.raf);
+    stopSound();
+    if (study.ctx) { try { study.ctx.close(); } catch (e) {} }
     study = null;
     overlayState();
-    setClass($('study'), 'on', false);
+    var s = $('study');
+    setClass(s, 'on', false);
+    setClass(s, 'picking', false);
+  }
+
+  /** ↑ ↓ outside the picker: the saved sounds in order, then silence. */
+  function cycleSaved(d) {
+    var list = savedSounds().concat([SILENCE]), id = soundId(study.current), at = -1;
+    for (var i = 0; i < list.length; i++) if (soundId(list[i]) === id) at = i;
+    var n = list.length;
+    playSound(list[at < 0 ? (d > 0 ? 0 : n - 1) : (at + d + n) % n]);
+  }
+
+  // MARK: the picker (a panel on the right; the timer slides left and keeps counting)
+
+  function fetchGenre(g, done) {
+    if (genreCache[g.tag]) return done(genreCache[g.tag]);
+    var path = '/json/stations/search?tag=' + encodeURIComponent(g.tag) + '&order=votes&reverse=true&hidebroken=true&limit=100', i = 0;
+    (function next() {
+      if (i >= RB_MIRRORS.length) return done(null);
+      var x = new XMLHttpRequest(), over = false, again = function () { if (!over) { over = true; next(); } };
+      try {
+        x.open('GET', RB_MIRRORS[i++] + path, true);
+        x.timeout = 8000;
+        x.onload = function () {
+          if (over) return;
+          var raw;
+          try { raw = JSON.parse(x.responseText); } catch (e) { return again(); }
+          over = true;
+          var out = [], seen = {};
+          for (var k = 0; k < raw.length && out.length < 40; k++) {
+            var r = raw[k], codec = String(r.codec || '').toUpperCase(), name = String(r.name || '').replace(/\s+/g, ' ').trim();
+            if (!r.url_resolved || !name || !/^(MP3|AAC|AAC\+)$/.test(codec) || seen[name.toLowerCase()]) continue;
+            seen[name.toLowerCase()] = true;
+            out.push({name: name.length > 46 ? name.slice(0, 45) + '…' : name, url: r.url_resolved,
+              meta: [r.countrycode, r.bitrate ? r.bitrate + ' kbps' : ''].filter(function (v) { return v; }).join(' · ')});
+          }
+          genreCache[g.tag] = out;
+          done(out);
+        };
+        x.onerror = x.ontimeout = again;
+        x.send();
+      } catch (e) { again(); }
+    })();
+  }
+
+  function openPicker() {
+    study.picker = {level: 'genres', genre: null, items: STUDY_GENRES, sel: 0, note: ''};
+    setClass($('study'), 'picking', true);
+    renderPicker();
+  }
+  function closePicker() {
+    study.picker = null;
+    setClass($('study'), 'picking', false);
+  }
+
+  function openGenre(g) {
+    var pk = study.picker;
+    pk.level = 'stations';
+    pk.genre = g;
+    pk.sel = 0;
+    pk.note = '';
+    if (g.saved) { pk.items = savedSounds(); if (!pk.items.length) pk.note = 'Nothing saved yet. OK twice on a station saves it.'; }
+    else if (g.noise) pk.items = NOISES;
+    else {
+      pk.items = [];
+      pk.note = 'Finding stations…';
+      fetchGenre(g, function (list) {
+        if (!study || study.picker !== pk || pk.genre !== g) return;
+        pk.items = list || [];
+        pk.note = list === null ? 'Couldn’t reach the station directory. Your saved sounds still play.' :
+          (list.length ? '' : 'No stations found here right now.');
+        renderPicker();
+      });
+    }
+    renderPicker();
+  }
+
+  var PICKER_ROWS = 10;
+  function renderPicker() {
+    var pk = study && study.picker, box = $('study') && $('study').querySelector('.picker');
+    if (!pk || !box) return;
+    box.innerHTML = '';
+    el('div', 'ttl', box, pk.level === 'genres' ? 'Sounds' : '‹  ' + pk.genre.name);
+    var first = Math.max(0, Math.min(pk.sel - Math.floor(PICKER_ROWS / 2), pk.items.length - PICKER_ROWS)), cur = study.current && soundId(study.current);
+    for (var i = first; i < Math.min(pk.items.length, first + PICKER_ROWS); i++) {
+      var it = pk.items[i], row = el('div', 'row' + (i === pk.sel ? ' sel' : ''), box);
+      var mark = pk.level === 'stations' ? (soundId(it) === cur ? '▶  ' : '') + (isSaved(it) ? '★  ' : '') : '';
+      el('span', '', row, mark + (it.visuals ? 'Visuals · ' + VIS_NAMES[study.visMode] : it.name));
+      if (it.visuals) el('span', 'm', row, 'OK to change');
+      else if (it.meta) el('span', 'm', row, it.meta);
+    }
+    if (pk.note) el('div', 'note', box, pk.note);
+    el('div', 'ph', box, pk.level === 'genres' ? 'OK to open  ·  ← or Back to close' :
+      'OK to play  ·  OK again to save or unsave ★  ·  ← back');
+  }
+
+  function pickerKey(k, keys) {
+    var pk = study.picker;
+    if (k === keys.back || k === 27 || k === 8 || k === keys.left) {
+      if (pk.level === 'stations') { pk.level = 'genres'; pk.items = STUDY_GENRES; pk.sel = Math.max(0, STUDY_GENRES.indexOf(pk.genre)); pk.note = ''; renderPicker(); }
+      else closePicker();
+      return true;
+    }
+    if (k === keys.up || k === keys.down) {
+      if (pk.items.length) pk.sel = (pk.sel + (k === keys.up ? pk.items.length - 1 : 1)) % pk.items.length;
+      renderPicker();
+      return true;
+    }
+    if (k === keys.ok || k === keys.right) {
+      var it = pk.items[pk.sel];
+      if (!it) return true;
+      if (it.visuals) { visStep(); renderPicker(); }
+      else if (pk.level === 'genres') openGenre(it);
+      else if (k === keys.ok && study.current && soundId(it) === soundId(study.current)) {
+        var on = toggleSaved(it);
+        if (hooks.toast) hooks.toast(on ? 'Saved · ↑ ↓ in Study reaches it' : 'Removed from saved');
+        musicLine();
+        renderPicker();
+      } else playSound(it);
+      return true;
+    }
+    return true;
   }
 
   function studyKey(k, keys) {
+    if (study.picker) return pickerKey(k, keys);
     if (k === keys.back || k === 27 || k === 8) { stopStudy(); return true; }
     if (k === keys.ok) {
-      if (study.paused) { study.start += Date.now() - study.pausedAt; study.paused = false; playRadio(); }
-      else { study.paused = true; study.pausedAt = Date.now(); if (study.audio) study.audio.pause(); }
+      if (study.paused) { study.start += Date.now() - study.pausedAt; study.paused = false; resumeSound(); }
+      else { study.paused = true; study.pausedAt = Date.now(); pauseSound(); }
       studyDraw();
       return true;
     }
     if (k === keys.right) { studyNext(); studyDraw(); return true; }
-    if (k === keys.up || k === keys.down) {
-      var n = STUDY_SOUNDS.length;
-      study.pick = (study.pick + (k === keys.up ? n - 1 : 1)) % n;
-      store('studySound', STUDY_SOUNDS[study.pick].name);
-      studySound();
-      return true;
-    }
+    if (k === keys.left) { openPicker(); return true; }
+    if (k === keys.up || k === keys.down) { cycleSaved(k === keys.up ? -1 : 1); return true; }
     return true;   // everything else stays in Study
   }
 

@@ -115,6 +115,22 @@ html.movie #stage.stars-on #stars { opacity: 0.35; }
 #study .dots { position: absolute; left: 0; right: 0; top: 650px; font-size: 34px; letter-spacing: 18px; color: #2E8A84; }
 #study .music { position: absolute; left: 0; right: 0; bottom: 150px; font-size: 26px; opacity: 0.75; }
 #study .hint { position: absolute; left: 0; right: 0; bottom: 90px; font-size: 22px; opacity: 0.5; }
+/* the sound picker: a panel on the right, the timer slides left and keeps counting */
+#study .phase, #study .time, #study .dots, #study .music, #study .hint { -webkit-transition: -webkit-transform 0.3s ease; transition: transform 0.3s ease; }
+#study.picking .phase, #study.picking .time, #study.picking .dots, #study.picking .music, #study.picking .hint { -webkit-transform: translateX(-330px); transform: translateX(-330px); }
+#study.picking .music, #study.picking .hint { padding-left: 120px; padding-right: 120px; }
+#study .picker { position: absolute; left: 1200px; top: 110px; width: 640px; height: 860px; display: none; text-align: left;
+  background: rgba(23, 19, 15, 0.94); border-radius: 18px; border: 1px solid rgba(243, 237, 228, 0.12); }
+#study.picking .picker { display: block; }
+#study .picker .ttl { padding: 36px 40px 20px; font-size: 32px; color: #8FD3CC; letter-spacing: 0.03em; }
+#study .picker .row { height: 64px; line-height: 64px; padding: 0 40px; font-size: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.78; }
+#study .picker .row.sel { background: #1F6F6B; opacity: 1; }
+#study .picker .row .m { margin-left: 16px; font-size: 20px; opacity: 0.6; }
+#study .picker .note { padding: 24px 40px; font-size: 24px; line-height: 1.4; opacity: 0.65; }
+#study canvas.vis { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: none; opacity: 0.62; image-rendering: pixelated; }
+#study.vis-on canvas.vis { display: block; }
+#study.vis-on .phase, #study.vis-on .time, #study.vis-on .dots, #study.vis-on .music, #study.vis-on .hint { text-shadow: 0 2px 26px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.85); }
+#study .picker .ph { position: absolute; left: 40px; right: 40px; bottom: 30px; font-size: 20px; opacity: 0.5; }
 
 /* fixes after the preview */
 #film .head { left: 222px; }
