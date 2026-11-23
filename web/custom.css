@@ -135,6 +135,8 @@ html.movie #stage.stars-on #stars { opacity: 0.35; }
 .mk-full > * { visibility: hidden; }
 .mk-full > #study, .mk-full > #perf, .mk-full > #toast { visibility: visible; }
 #study.vis-on .phase, #study.vis-on .time, #study.vis-on .dots, #study.vis-on .music, #study.vis-on .hint { text-shadow: 0 2px 26px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.85); }
+#study .picker .srch { display: block; box-sizing: border-box; width: 560px; margin: 8px 40px 0; padding: 14px 18px; font: inherit; font-size: 30px; color: #F3EDE4;
+  background: rgba(243, 237, 228, 0.08); border: 2px solid #1F6F6B; border-radius: 10px; outline: none; }
 #study .picker .ph { position: absolute; left: 40px; right: 40px; bottom: 30px; font-size: 20px; opacity: 0.5; }
 
 /* fixes after the preview */

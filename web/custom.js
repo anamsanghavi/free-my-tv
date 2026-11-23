@@ -30,8 +30,24 @@ var Custom = (function () {
   // the picker's first page; Genres, Countries and Languages are read from Radio Browser, with these first in each
   var STUDY_GENRES = [
     {name: 'Visuals', visuals: true}, {name: 'MilkDrop · next look', nextLook: true}, {name: 'Saved', saved: true},
+    {name: 'Search stations', search: true, meta: 'by name'}, {name: 'Indian FM', fm: true}, {name: 'Podcasts', pods: true, meta: 'stories, horror, RJ shows'},
     {name: 'Genres', list: 'tags', meta: 'all of them'}, {name: 'Countries', list: 'countries'}, {name: 'Languages', list: 'languages'},
     {name: 'Most played worldwide', q: 'order=clickcount&reverse=true'}, {name: 'Noise · works offline', noise: true}
+  ];
+  // the big Indian FM brands, found in Radio Browser by name (which streams are official isn't known: some are relays)
+  var INDIAN_FM = [
+    {name: 'Radio Mirchi', q: 'name=mirchi'}, {name: 'Red FM', q: 'name=red%20fm'}, {name: 'Radio City', q: 'name=radio%20city'},
+    {name: 'Big FM', q: 'name=big%20fm'}, {name: 'Vividh Bharati', q: 'name=vividh'}, {name: 'AIR FM Gold', q: 'name=fm%20gold'},
+    {name: 'Ishq FM', q: 'name=ishq'}, {name: 'Radio Mirchi · Gujarati', q: 'name=mirchi&language=gujarati'}
+  ];
+  // podcasts the stations publish themselves (open feeds); episodes play like any sound, newest first, one after another
+  var PODCASTS = [
+    {name: 'Ek Kahani Aisi Bhi', by: 'Red FM · RJ Praveen’s late-night ghost stories', feed: 'https://omny.fm/shows/ek-kahani-aisi-bhi/playlists/podcast.rss'},
+    {name: 'Ek Choti Si Horror Story', by: 'Red FM · RJ Mohnish', feed: 'https://omny.fm/shows/ek-choti-si-horror-story/playlists/podcast.rss'},
+    {name: 'Red FM Bauaa', by: 'Red FM · RJ Raunac’s prank calls', feed: 'https://www.omnycontent.com/d/playlist/8ce708b9-c3c2-4eaa-a27d-ac0f007c53c5/232a6ee0-f0fb-4a77-a1cd-ac22009d88c7/8c8aa2ff-faca-4553-a635-ac22009d88d0/podcast.rss'},
+    {name: 'Red Murga', by: 'Red FM · RJ Praveen’s prank calls', feed: 'https://omny.fm/shows/red-murga/playlists/podcast.rss'},
+    {name: 'Morning No. 1 with RJ Dhrumil', by: 'Red FM · Gujarati mornings', feed: 'https://www.omnycontent.com/d/playlist/8ce708b9-c3c2-4eaa-a27d-ac0f007c53c5/660b4d3a-7d72-4093-b171-ac46009be068/2ee27847-20a0-42f9-b737-ac46009be077/podcast.rss'},
+    {name: 'The Devdutt Pattanaik Show', by: 'Mirchi · mythology', feed: 'https://feeds.simplecast.com/pgsclD_d'}
   ];
   var PIN_TAGS = ['lofi', 'jazz', 'classical', 'piano', 'ambient', 'chillout', 'indian classical', 'bollywood', 'ghazal', 'nature'];
   var PIN_COUNTRIES = ['CA', 'IN', 'US', 'GB'];
@@ -1238,6 +1254,7 @@ var Custom = (function () {
         a.loop = !!snd.loop;
         a.volume = 0.6;
         a.addEventListener('playing', function () { started = true; if (study && study.audio === a) { study.failed = false; musicLine(); } });
+        if (snd.episode) a.addEventListener('ended', function () { if (study && study.audio === a) nextEpisode(snd); });
         a.addEventListener('error', function () {
           if (cors && study && study.audio === a && !started) { study.noCors[snd.url] = true; playSound(snd); }
           else fail();
@@ -1297,7 +1314,7 @@ var Custom = (function () {
 
   function tapMaybe() {
     var snd = study.current;
-    if (MEDIA_TAP || study.paused || study.visMode === 'off' || !snd || !snd.url || !/^https?:/.test(snd.url) || study.noTap[snd.url]) return;
+    if (MEDIA_TAP || study.paused || study.visMode === 'off' || !snd || !snd.url || snd.episode || !/^https?:/.test(snd.url) || study.noTap[snd.url]) return;
     if (study.tap && study.tap.url === snd.url) return;
     if (!visGraph()) return;
     tapStop();
@@ -1831,6 +1848,10 @@ var Custom = (function () {
 
   /** Opens a row that leads somewhere: saved, noise, a list, or a list's stations. */
   function openItem(it) {
+    if (it.fm) { study.picker.stack.push({title: 'Indian FM', items: INDIAN_FM.map(function (f) { return {name: f.name, q: f.q + '&order=votes&reverse=true'}; }), sel: 0, note: ''}); return renderPicker(); }
+    if (it.pods) { study.picker.stack.push({title: 'Podcasts', items: PODCASTS.map(function (p) { return {name: p.name, meta: p.by, feed: p.feed}; }), sel: 0, note: ''}); return renderPicker(); }
+    if (it.search) { study.picker.stack.push({title: 'Search stations', items: [], sel: 0, search: true, text: '', note: 'Type a station name, then OK.'}); return renderPicker(); }
+    if (it.feed) return openFeed(it);
     var v = {title: it.name, items: [], sel: 0, note: '', stations: !it.list};
     study.picker.stack.push(v);
     var path = it.list ? '/json/' + it.list + '?order=stationcount&reverse=true&hidebroken=true' + (it.list === 'countries' ? '' : '&limit=400') :
@@ -1849,6 +1870,53 @@ var Custom = (function () {
     renderPicker();
   }
 
+  /** A podcast's episodes from its open feed, newest first. */
+  function openFeed(it) {
+    var v = {title: it.name, items: [], sel: 0, note: 'Loading episodes…', stations: true, episodes: true};
+    study.picker.stack.push(v);
+    renderPicker();
+    if (genreCache[it.feed]) return feedDone(v, genreCache[it.feed]);
+    var x = new XMLHttpRequest();
+    try {
+      x.open('GET', it.feed, true);
+      x.timeout = 15000;
+      x.onload = function () {
+        var eps = [];
+        try {
+          var doc = new DOMParser().parseFromString(x.responseText, 'text/xml'), items = doc.getElementsByTagName('item');
+          for (var i = 0; i < items.length && eps.length < 150; i++) {
+            var n = items[i], enc = n.getElementsByTagName('enclosure')[0], url = enc && enc.getAttribute('url');
+            if (!url) continue;
+            var title = (n.getElementsByTagName('title')[0] || {}).textContent || 'Episode', when = (n.getElementsByTagName('pubDate')[0] || {}).textContent;
+            var dur = (n.getElementsByTagName('itunes:duration')[0] || {}).textContent || '', d = when ? new Date(when) : null;
+            var mins = /:/.test(dur) ? dur.split(':').reduce(function (a, b) { return a * 60 + (+b || 0); }, 0) / 60 : (+dur || 0) / 60;
+            title = title.replace(/\s+/g, ' ').replace(/^RED FM( BAUAA)?\s*[:;-]+\s*/i, '').trim();
+            eps.push({name: title.length > 46 ? title.slice(0, 45) + '…' : title, url: url, episode: true,
+              meta: [d && !isNaN(d) ? d.getDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()] + ' ' + d.getFullYear() : '',
+                mins ? Math.round(mins) + ' min' : ''].filter(function (q) { return q; }).join(' · ')});
+          }
+        } catch (e) {}
+        genreCache[it.feed] = eps;
+        feedDone(v, eps);
+      };
+      x.onerror = x.ontimeout = function () { feedDone(v, null); };
+      x.send();
+    } catch (e) { feedDone(v, null); }
+  }
+  function feedDone(v, eps) {
+    if (!study || !study.picker || view() !== v) return;
+    v.items = eps || [];
+    v.note = eps === null ? 'Couldn’t load this podcast right now.' : (v.items.length ? '' : 'No episodes found.');
+    renderPicker();
+  }
+
+  /** After an episode ends, the next one down the list (older), so a podcast plays on like the radio. */
+  function nextEpisode(snd) {
+    var list = study && study.epList;
+    if (!list) return;
+    for (var i = 0; i < list.length; i++) if (list[i].url === snd.url && list[i + 1]) return playSound(list[i + 1]);
+  }
+
   var PICKER_ROWS = 10;
   function renderPicker() {
     var pk = study && study.picker, box = $('study') && $('study').querySelector('.picker');
@@ -1865,13 +1933,35 @@ var Custom = (function () {
       else if (it.nextLook) el('span', 'm', row, !mkSupported() ? 'needs WebGL 2, not on this TV' : (study.visMode === 'milkdrop' && study.mkName ? study.mkName.slice(0, 34) : ''));
       else if (it.meta) el('span', 'm', row, it.meta);
     }
+    if (v.search) {
+      var f = el('input', 'srch', box);
+      f.type = 'text';
+      f.value = v.text || '';
+      f.setAttribute('placeholder', 'Station name, like Mirchi or CBC');
+      setTimeout(function () { try { f.focus(); } catch (e) {} }, 30);
+    }
     if (v.note) el('div', 'note', box, v.note);
+    if (v.search) { el('div', 'ph', box, 'OK to search  ·  Back to go back'); return; }
     el('div', 'ph', box, !v.stations ? 'OK to open  ·  ← or Back to ' + (top ? 'close' : 'go back') :
       'OK to play  ·  OK again to save or unsave ★  ·  ← back');
   }
 
   function pickerKey(k, keys) {
     var v = view(), n = v.items.length;
+    if (v.search) {
+      var f = $('study').querySelector('.picker .srch');
+      if (k === keys.ok || k === 65376 || k === 13) {
+        var t = f ? String(f.value).trim() : '';
+        if (f) f.blur();
+        v.text = t;
+        if (t.length < 2) { v.note = 'Type at least two letters.'; renderPicker(); return true; }
+        study.picker.stack.pop();
+        openItem({name: '“' + t + '”', q: 'name=' + encodeURIComponent(t) + '&order=votes&reverse=true'});
+        return true;
+      }
+      if (k === keys.back || k === 27 || k === 65385) { if (f) f.blur(); study.picker.stack.pop(); renderPicker(); return true; }
+      return 'type';
+    }
     if (k === keys.back || k === 27 || k === 8 || k === keys.left) {
       if (study.picker.stack.length > 1) { study.picker.stack.pop(); renderPicker(); } else closePicker();
       return true;
@@ -1903,7 +1993,10 @@ var Custom = (function () {
         if (hooks.toast) hooks.toast(on ? 'Saved · ↑ ↓ in Study reaches it' : 'Removed from saved');
         musicLine();
         renderPicker();
-      } else playSound(it);
+      } else {
+        if (it.episode) study.epList = v.items;
+        playSound(it);
+      }
       return true;
     }
     return true;
