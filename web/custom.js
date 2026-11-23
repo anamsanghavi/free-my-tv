@@ -41,7 +41,13 @@ var Custom = (function () {
   var VIS_MODES = ['milkdrop', 'tunnel', 'bars', 'scope', 'off'];
   var VIS_NAMES = {milkdrop: 'MilkDrop', tunnel: 'Tunnel', bars: 'Bars', scope: 'Scope', off: 'Off'};
   // MilkDrop (butterchurn, MIT: web/vendor) needs WebGL 2; it's newer JavaScript, so it's loaded only where that exists
-  var MK_W = 512, MK_H = 288, MK_EVERY = 30, MK_BLEND = 2.7;
+  var MK_W = 512, MK_H = 288, MK_EVERY = 30, MK_BLEND = 1.6;
+  // Self-tuning detail: it aims for 60 frames a second and steps down a tier when it can't hold 50, back up after a long
+  // smooth stretch. A look that still can't hold 24 at the lowest tier is skipped from then on (kept in 'mkSlow').
+  var MK_TIERS = [
+    {w: 512, h: 288, mw: 48, mh: 36, every: 1}, {w: 448, h: 252, mw: 40, mh: 30, every: 1}, {w: 384, h: 216, mw: 32, mh: 24, every: 1},
+    {w: 320, h: 180, mw: 24, mh: 18, every: 1}, {w: 320, h: 180, mw: 24, mh: 18, every: 2}
+  ];
   var mk = {ok: null, loading: false, loaded: false, presets: null, names: null};
   function mkSupported() {
     if (mk.ok === null) {
@@ -1519,6 +1525,7 @@ var Custom = (function () {
     var s = $('study'), c = s && s.querySelector('canvas.vis');
     setClass(s, 'vis-on', study.visMode !== 'off');
     setClass(s, 'mk-on', study.visMode === 'milkdrop');
+    setClass(s.parentNode, 'mk-full', study.visMode === 'milkdrop');   // nothing drawn behind it while it shows
     if (study.visMode === 'milkdrop') return mkStart();
     mkStop();
     if (!c || study.visMode === 'off' || study.raf) return;
@@ -1597,8 +1604,46 @@ var Custom = (function () {
 
   function mkNext(blend) {
     if (!study.mkViz || !mk.names) return;
-    var name = mk.names[Math.floor(Math.random() * mk.names.length)];
-    try { study.mkViz.loadPreset(mk.presets[name], blend); study.mkName = name; study.mkAt = Date.now(); } catch (e) {}
+    var slow = stored('mkSlow') || [], pool = mk.names.filter(function (n) { return slow.indexOf(n) < 0 && n !== study.mkName; });
+    if (!pool.length) pool = mk.names;
+    var name = pool[Math.floor(Math.random() * pool.length)];
+    try {
+      study.mkViz.loadPreset(mk.presets[name], blend);
+      study.mkName = name;
+      study.mkAt = Date.now();
+      study.mkWin = {from: Date.now() + blend * 1000 + 500, frames: 0};   // judged after its blend
+    } catch (e) {}
+  }
+
+  function mkTier(i) {
+    var t = MK_TIERS[i], c = $('study') && $('study').querySelector('canvas.mk');
+    study.mkTierAt = i;
+    study.mkSince = Date.now();
+    if (!c || !study.mkViz) return;
+    c.width = t.w;
+    c.height = t.h;
+    try { study.mkViz.setRendererSize(t.w, t.h, {meshWidth: t.mw, meshHeight: t.mh}); } catch (e) {}
+  }
+
+  /** Once a second: the frame rate drawn, and whether to step the detail down or up, or skip a look that's too heavy. */
+  function mkTune() {
+    var w = study.mkWin, now = Date.now();
+    if (!w || now < w.from) return;
+    var secs = (now - w.from) / 1000;
+    if (secs < 2) return;
+    var tier = MK_TIERS[study.mkTierAt], fps = w.frames / secs, cap = 60 / tier.every, next = MK_TIERS[study.mkTierAt + 1];
+    study.mkFps = Math.round(fps);
+    study.mkWin = {from: now, frames: 0};
+    // step down when it can't hold 50 (or, before the half-rate tier, when it can't hold 30 anyway)
+    if (next && fps < (next.every > tier.every ? 30 : 50)) { mkTier(study.mkTierAt + 1); study.mkGood = 0; return; }
+    if (!next && fps < 24) {
+      var slow = stored('mkSlow') || [];
+      if (slow.indexOf(study.mkName) < 0) { slow.push(study.mkName); store('mkSlow', slow.slice(-60)); }
+      mkNext(0.5);
+      return;
+    }
+    study.mkGood = fps >= cap * 0.95 ? (study.mkGood || 0) + 1 : 0;
+    if (study.mkGood >= 8 && study.mkTierAt > 0) { mkTier(study.mkTierAt - 1); study.mkGood = 0; }
   }
 
   function mkStart() {
@@ -1612,19 +1657,29 @@ var Custom = (function () {
         if (!study.mkViz) {
           var B = window.butterchurn;
           B = B && (B.createVisualizer ? B : B['default']);
-          study.mkViz = B.createVisualizer(study.ctx, c, {width: MK_W, height: MK_H, pixelRatio: 1, textureRatio: 1});
+          var t0 = MK_TIERS[stored('mkTier') || 0] || MK_TIERS[0];   // start where it settled last time
+          c.width = t0.w;
+          c.height = t0.h;
+          study.mkViz = B.createVisualizer(study.ctx, c, {width: t0.w, height: t0.h, meshWidth: t0.mw, meshHeight: t0.mh, pixelRatio: 1, textureRatio: 1});
+          study.mkTierAt = MK_TIERS.indexOf(t0);
           mkNext(0);
         }
       } catch (e) { study.visMode = 'tunnel'; return visStart(); }
       if (!study.paused) { try { study.ctx.resume(); } catch (e) {} }
-      var frame = 0;
+      var frame = 0, tuned = Date.now();
       (function loop() {
         if (!study || study.visMode !== 'milkdrop') { if (study) study.mkRaf = 0; return; }
         study.mkRaf = requestAnimationFrame(loop);
-        if (++frame % 2) return;   // 30 frames a second
+        if (++frame % MK_TIERS[study.mkTierAt].every) return;
         mkFeed();
         if (Date.now() - study.mkAt > MK_EVERY * 1000) mkNext(MK_BLEND);
         try { study.mkViz.render(); } catch (e) {}
+        if (study.mkWin) study.mkWin.frames++;
+        if (Date.now() - tuned > 1000) {
+          tuned = Date.now();
+          mkTune();
+          if (study.mkTierAt !== study.mkSaved) { study.mkSaved = study.mkTierAt; store('mkTier', study.mkTierAt); }
+        }
       })();
     });
   }
@@ -1672,6 +1727,7 @@ var Custom = (function () {
       audio: null, noise: null, ctx: null, watch: 0, current: null, failed: false, picker: null,
       visMode: visModes().indexOf(vm) >= 0 ? vm : visModes()[0], analyser: null, synced: false, noCors: {}, raf: 0,
       mkViz: null, mkRaf: 0, mkFed: null, mkName: '', mkAt: 0, groove: null, tap: null, noTap: {},
+      mkTierAt: 0, mkSince: 0, mkWin: null, mkFps: 0, mkGood: 0, mkSaved: -1,
       freq: new Uint8Array(256), wave: new Uint8Array(512), peaks: []};
     playSound(stored('studyNow') || savedSounds()[0] || SILENCE);
     visStart();
@@ -1693,6 +1749,7 @@ var Custom = (function () {
     var s = $('study');
     setClass(s, 'on', false);
     setClass(s, 'picking', false);
+    setClass(s.parentNode, 'mk-full', false);
   }
 
   /** ↑ ↓ outside the picker: the saved sounds in order, then silence. */
@@ -2411,6 +2468,12 @@ var Custom = (function () {
       ['Light layers', lit + ' of ' + lights.length],
       ['Lite mode', /(^| )lite( |$)/.test(document.documentElement.className) ? 'yes' : 'no']
     ];
+    if (study && study.visMode === 'milkdrop' && study.mkViz) {
+      var tier = MK_TIERS[study.mkTierAt];
+      rows.push(['MilkDrop', (study.mkFps || '…') + ' fps · ' + tier.w + '×' + tier.h + ' · tier ' + (study.mkTierAt + 1) + ' of ' + MK_TIERS.length]);
+      rows.push(['Look', (study.mkName || '-').slice(0, 30)]);
+      rows.push(['Skipped as too heavy', String((stored('mkSlow') || []).length)]);
+    }
     box.innerHTML = '';
     for (i = 0; i < rows.length; i++) {
       var r = el('div', 'r', box);
