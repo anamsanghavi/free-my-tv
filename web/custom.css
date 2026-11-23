@@ -129,6 +129,9 @@ html.movie #stage.stars-on #stars { opacity: 0.35; }
 #study .picker .note { padding: 24px 40px; font-size: 24px; line-height: 1.4; opacity: 0.65; }
 #study canvas.vis { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: none; opacity: 0.62; image-rendering: pixelated; }
 #study.vis-on canvas.vis { display: block; }
+#study canvas.mk { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: none; opacity: 0.7; }
+#study.mk-on canvas.vis { display: none; }
+#study.mk-on canvas.mk { display: block; }
 #study.vis-on .phase, #study.vis-on .time, #study.vis-on .dots, #study.vis-on .music, #study.vis-on .hint { text-shadow: 0 2px 26px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.85); }
 #study .picker .ph { position: absolute; left: 40px; right: 40px; bottom: 30px; font-size: 20px; opacity: 0.5; }
 

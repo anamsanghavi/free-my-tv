@@ -105,6 +105,10 @@ def files(config, made_by):
             continue
         with open(os.path.join(web, name), 'rb') as f:
             out[name] = f.read()
+    vendor = os.path.join(web, 'vendor')   # libraries loaded only where they can run (Study's MilkDrop: WebGL 2)
+    for name in sorted(os.listdir(vendor)) if os.path.isdir(vendor) else []:
+        with open(os.path.join(vendor, name), 'rb') as f:
+            out['vendor/' + name] = f.read()
     icons = os.path.join(web, 'icons')
     for name in sorted(os.listdir(icons)):
         with open(os.path.join(icons, name), 'rb') as f:

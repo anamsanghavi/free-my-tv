@@ -28,14 +28,26 @@ var Custom = (function () {
   var NOISES = [{name: 'Brown noise', noise: 'brown', meta: 'deep, like a far waterfall'},
     {name: 'Pink noise', noise: 'pink', meta: 'soft, like steady rain'}, {name: 'White noise', noise: 'white', meta: 'bright, like a fan'}];
   var STUDY_GENRES = [
-    {name: 'Visuals', visuals: true}, {name: 'Saved', saved: true}, {name: 'Lo-fi', tag: 'lofi'}, {name: 'Jazz', tag: 'jazz'}, {name: 'Classical', tag: 'classical'},
+    {name: 'Visuals', visuals: true}, {name: 'MilkDrop · next look', nextLook: true}, {name: 'Saved', saved: true}, {name: 'Lo-fi', tag: 'lofi'}, {name: 'Jazz', tag: 'jazz'}, {name: 'Classical', tag: 'classical'},
     {name: 'Piano', tag: 'piano'}, {name: 'Ambient', tag: 'ambient'}, {name: 'Chillout', tag: 'chillout'},
     {name: 'Indian classical', tag: 'indian classical'}, {name: 'Bollywood', tag: 'bollywood'}, {name: 'Ghazal', tag: 'ghazal'},
     {name: 'Nature sounds', tag: 'nature'}, {name: 'Noise · works offline', noise: true}
   ];
   var SILENCE = {name: 'Silence'};
   // the visuals: the old media-player kind, drawn small (480×270) and scaled up, so they're cheap and a bit pixelly on purpose
-  var VIS_MODES = ['tunnel', 'bars', 'scope', 'off'], VIS_NAMES = {tunnel: 'Tunnel', bars: 'Bars', scope: 'Scope', off: 'Off'};
+  var VIS_MODES = ['milkdrop', 'tunnel', 'bars', 'scope', 'off'];
+  var VIS_NAMES = {milkdrop: 'MilkDrop', tunnel: 'Tunnel', bars: 'Bars', scope: 'Scope', off: 'Off'};
+  // MilkDrop (butterchurn, MIT: web/vendor) needs WebGL 2; it's newer JavaScript, so it's loaded only where that exists
+  var MK_W = 512, MK_H = 288, MK_EVERY = 30, MK_BLEND = 2.7;
+  var mk = {ok: null, loading: false, loaded: false, presets: null, names: null};
+  function mkSupported() {
+    if (mk.ok === null) {
+      try { var c = document.createElement('canvas'); mk.ok = !!(window.WebGL2RenderingContext && c.getContext('webgl2')); }
+      catch (e) { mk.ok = false; }
+    }
+    return mk.ok;
+  }
+  function visModes() { return mkSupported() ? VIS_MODES : VIS_MODES.slice(1); }
   var VIS_W = 480, VIS_H = 270;
   // LG and Samsung play <audio> in the TV's own media pipeline: an analyser on it reads only zeros. There the stations get a
   // made-up beat, and what can be heard through Web Audio (the noise, the rain loop) drives the visuals for real.
@@ -1398,21 +1410,124 @@ var Custom = (function () {
   function visStart() {
     var s = $('study'), c = s && s.querySelector('canvas.vis');
     setClass(s, 'vis-on', study.visMode !== 'off');
+    setClass(s, 'mk-on', study.visMode === 'milkdrop');
+    if (study.visMode === 'milkdrop') return mkStart();
+    mkStop();
     if (!c || study.visMode === 'off' || study.raf) return;
     var g = c.getContext('2d'), frame = 0, t0 = Date.now();
     g.fillStyle = '#000';
     g.fillRect(0, 0, VIS_W, VIS_H);
     (function loop() {
-      if (!study || study.visMode === 'off') { if (study) study.raf = 0; return; }
+      if (!study || study.visMode === 'off' || study.visMode === 'milkdrop') { if (study) study.raf = 0; return; }
       study.raf = requestAnimationFrame(loop);
       if (++frame % 2) return;   // 30 frames a second is plenty for this
       try { visDraw(g, c, (Date.now() - t0) / 1000); } catch (e) {}
     })();
   }
 
+  // MARK: MilkDrop
+
+  function mkLoad(done) {
+    if (mk.loaded) return done(true);
+    if (mk.loading) { mk.waiting = done; return; }
+    mk.loading = true;
+    mk.waiting = done;
+    var left = 2, finish = function (ok) {
+      if (!ok) left = -99;
+      if (--left === 0) {
+        try {
+          var P = window.butterchurnPresets;
+          P = P && (P.getPresets ? P : P['default']);
+          mk.presets = P.getPresets();
+          mk.names = Object.keys(mk.presets);
+          mk.loaded = true;
+        } catch (e) { mk.ok = false; }
+      }
+      if (left <= 0 && mk.waiting) { var w = mk.waiting; mk.waiting = null; mk.loading = false; w(mk.loaded); }
+    };
+    ['vendor/butterchurn.min.js', 'vendor/butterchurnPresets.min.js'].forEach(function (src) {
+      var sc = document.createElement('script');
+      sc.src = src;
+      sc.onload = function () { finish(true); };
+      sc.onerror = function () { finish(false); };
+      document.head.appendChild(sc);
+    });
+  }
+
+  /** A made-up groove as real audio (never sent to the speakers), for MilkDrop to dance to when the station can't be heard. */
+  function mkGroove(ctx) {
+    if (study.groove) return study.groove;
+    var rate = ctx.sampleRate, beat = 60 / 92, len = Math.floor(rate * beat * 8), buf = ctx.createBuffer(1, len, rate), d = buf.getChannelData(0);
+    var chords = [[220, 277.2, 329.6], [196, 246.9, 293.7], [174.6, 220, 261.6], [196, 246.9, 311.1]];
+    for (var i = 0; i < len; i++) {
+      var t = i / rate, b = Math.floor(t / beat), tb = t - b * beat, te = (t % (beat / 2));
+      var v = 0, ch = chords[Math.floor(b / 2) % 4];
+      if (b % 2 === 0) v += Math.sin(2 * Math.PI * (50 + 90 * Math.exp(-tb * 30)) * tb) * Math.exp(-tb * 6) * 0.9;   // kick
+      else v += (Math.random() * 2 - 1) * Math.exp(-tb * 14) * 0.45;   // snare
+      v += (Math.random() * 2 - 1) * Math.exp(-te * 60) * 0.12;   // hats
+      for (var k = 0; k < 3; k++) v += Math.sin(2 * Math.PI * ch[k] * t) * 0.07 * (0.6 + 0.4 * Math.sin(t * 1.3));
+      d[i] = v * 0.8;
+    }
+    var src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(g);
+    src.start();
+    study.groove = g;
+    return g;
+  }
+
+  /** Feeds MilkDrop what's playing: the analyser when it can be read, else the made-up groove. */
+  function mkFeed() {
+    if (!study.mkViz) return;
+    var want = study.synced && study.analyser ? study.analyser : (study.current && (study.current.url || study.current.noise) ? mkGroove(study.ctx) : null);
+    if (want === study.mkFed) return;
+    try { if (study.mkFed) study.mkViz.disconnectAudio(study.mkFed); } catch (e) {}
+    study.mkFed = want;
+    try { if (want) study.mkViz.connectAudio(want); } catch (e) {}
+  }
+
+  function mkNext(blend) {
+    if (!study.mkViz || !mk.names) return;
+    var name = mk.names[Math.floor(Math.random() * mk.names.length)];
+    try { study.mkViz.loadPreset(mk.presets[name], blend); study.mkName = name; study.mkAt = Date.now(); } catch (e) {}
+  }
+
+  function mkStart() {
+    if (!mkSupported()) { study.visMode = 'tunnel'; return visStart(); }
+    var s = $('study'), c = s && s.querySelector('canvas.mk');
+    if (!c || study.mkRaf) return;
+    mkLoad(function (ok) {
+      if (!study || study.visMode !== 'milkdrop') return;
+      if (!ok || !visGraph()) { study.visMode = 'tunnel'; return visStart(); }
+      try {
+        if (!study.mkViz) {
+          var B = window.butterchurn;
+          B = B && (B.createVisualizer ? B : B['default']);
+          study.mkViz = B.createVisualizer(study.ctx, c, {width: MK_W, height: MK_H, pixelRatio: 1, textureRatio: 1});
+          mkNext(0);
+        }
+      } catch (e) { study.visMode = 'tunnel'; return visStart(); }
+      if (!study.paused) { try { study.ctx.resume(); } catch (e) {} }
+      var frame = 0;
+      (function loop() {
+        if (!study || study.visMode !== 'milkdrop') { if (study) study.mkRaf = 0; return; }
+        study.mkRaf = requestAnimationFrame(loop);
+        if (++frame % 2) return;   // 30 frames a second
+        mkFeed();
+        if (Date.now() - study.mkAt > MK_EVERY * 1000) mkNext(MK_BLEND);
+        try { study.mkViz.render(); } catch (e) {}
+      })();
+    });
+  }
+
+  function mkStop() {
+    if (study && study.mkRaf) { cancelAnimationFrame(study.mkRaf); study.mkRaf = 0; }
+  }
+
   function visStep() {
-    var was = study.visMode;
-    study.visMode = VIS_MODES[(VIS_MODES.indexOf(was) + 1) % VIS_MODES.length];
+    var was = study.visMode, modes = visModes();
+    study.visMode = modes[(modes.indexOf(was) + 1) % modes.length];
     store('studyVis', study.visMode);
     if (was === 'off' && study.current && study.current.url) playSound(study.current);   // to ask for it with CORS this time
     visStart();
@@ -1433,6 +1548,9 @@ var Custom = (function () {
     var cv = el('canvas', 'vis', s);
     cv.width = VIS_W;
     cv.height = VIS_H;
+    var mc = el('canvas', 'mk', s);
+    mc.width = MK_W;
+    mc.height = MK_H;
     el('div', 'phase', s);
     el('div', 'time', s);
     el('div', 'dots', s);
@@ -1442,7 +1560,8 @@ var Custom = (function () {
     var vm = stored('studyVis');
     study = {focus: true, length: FOCUS_MIN * 60, start: Date.now(), paused: false, pausedAt: 0, done: 0, timer: 0,
       audio: null, noise: null, ctx: null, watch: 0, current: null, failed: false, picker: null,
-      visMode: VIS_MODES.indexOf(vm) >= 0 ? vm : 'tunnel', analyser: null, synced: false, noCors: {}, raf: 0,
+      visMode: visModes().indexOf(vm) >= 0 ? vm : visModes()[0], analyser: null, synced: false, noCors: {}, raf: 0,
+      mkViz: null, mkRaf: 0, mkFed: null, mkName: '', mkAt: 0, groove: null,
       freq: new Uint8Array(256), wave: new Uint8Array(512), peaks: []};
     playSound(stored('studyNow') || savedSounds()[0] || SILENCE);
     visStart();
@@ -1456,6 +1575,7 @@ var Custom = (function () {
     if (!study) return;
     clearInterval(study.timer);
     if (study.raf) cancelAnimationFrame(study.raf);
+    mkStop();
     stopSound();
     if (study.ctx) { try { study.ctx.close(); } catch (e) {} }
     study = null;
@@ -1550,6 +1670,7 @@ var Custom = (function () {
       var mark = pk.level === 'stations' ? (soundId(it) === cur ? '▶  ' : '') + (isSaved(it) ? '★  ' : '') : '';
       el('span', '', row, mark + (it.visuals ? 'Visuals · ' + VIS_NAMES[study.visMode] : it.name));
       if (it.visuals) el('span', 'm', row, 'OK to change');
+      else if (it.nextLook) el('span', 'm', row, !mkSupported() ? 'needs WebGL 2, not on this TV' : (study.visMode === 'milkdrop' && study.mkName ? study.mkName.slice(0, 34) : ''));
       else if (it.meta) el('span', 'm', row, it.meta);
     }
     if (pk.note) el('div', 'note', box, pk.note);
@@ -1573,6 +1694,13 @@ var Custom = (function () {
       var it = pk.items[pk.sel];
       if (!it) return true;
       if (it.visuals) { visStep(); renderPicker(); }
+      else if (it.nextLook) {
+        if (mkSupported()) {
+          if (study.visMode !== 'milkdrop') { study.visMode = 'milkdrop'; store('studyVis', 'milkdrop'); visStart(); }
+          else mkNext(MK_BLEND);
+        }
+        setTimeout(renderPicker, 50);
+      }
       else if (pk.level === 'genres') openGenre(it);
       else if (k === keys.ok && study.current && soundId(it) === soundId(study.current)) {
         var on = toggleSaved(it);
