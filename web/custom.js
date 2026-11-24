@@ -41,7 +41,47 @@ var Custom = (function () {
     {name: 'Ishq FM', q: 'name=ishq'}, {name: 'Radio Mirchi · Gujarati', q: 'name=mirchi&language=gujarati'}
   ];
   // podcasts the stations publish themselves (open feeds); episodes play like any sound, newest first, one after another
+  // Yaadon Ka Idiot Box (Big FM, 2011-2020): the 34 episodes Big FM's own podcast page plays, from Big FM's own storage
+  var YKIB_BASE = 'https://sgp1.digitaloceanspaces.com/bigfmindia/';
+  var YKIB = [
+      ['Aayat', '2019/05/AAYAT-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Baat Paise Ki', '2019/05/BAAT-PAISE-KI-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Chaar Rituaon Wala Intezar', '2019/05/CHAAR-RITUAON-WALA-INTEZAR-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Duaaon Ka Asar', '2019/05/DUAAON-KA-ASAR-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Fiasala', '2019/05/Fiasala-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Hara Samandar', '2019/05/HARA-SAMANDAR-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Jharna', '2019/05/JHARNA-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Khamoshiyaan', '2019/05/KHAMOSHIYAAN-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Kora Aanchal', '2019/05/Kora-Aanchal-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['My Dear Professor', '2019/05/MY-DEAR-PROFESSOR-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Panne', '2019/05/Panne-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Saloni', '2019/05/SALONI-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Sorry Maria', '2019/05/SORRY-MARIA-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Tum Nadi Ban Jaana', '2019/05/TUM-NADI-BAN-JAANA-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Wo Jo Ishq Tha', '2019/05/WO-JO-ISHQ-THA-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Zindagi Haseen Hai', '2019/05/Zindagi-Haseen-Hai-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Ek Tha Ishq Adhoora', '2019/05/EK-THA-ISHQ-ADHOORA-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Taai', '2019/05/TAAI-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Teri Aadat', '2019/05/TERI-AADAT-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Us Baras Ki Barsat', '2019/05/US-BARAS-KI-BARSAT-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Achhi Ladki', '2019/06/ACHHI-LADKI-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Bachpan Ke Chhor Par', '2019/06/BACHPAN-KE-CHHOR-PAR-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA-13TH-JUNE-2019'],
+      ['Dadu Ke Qisse', '2019/06/DADU-KE-QISSE-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA-4TH-JUNE'],
+      ['Dost Samandar', '2019/06/DOST-SAMANDAR-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA-10TH-JUNE-2019'],
+      ['Ek Mod Manchaha', '2019/06/EK-MOD-MANCHAHA-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Gulabi Cycle', '2019/06/GULABI-CYCLE-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA-14TH-JUNE-2019'],
+      ['Hai Lambi Judaai', '2019/06/HAI-LAMBI-JUDAAI-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Mustafa Ka Pehla Roza', '2019/06/MUSTAFA-KA-PEHLA-ROZA-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA-5TH-JUNE'],
+      ['Nana Ka Udhankhatola', '2019/06/NANA-KA-UDHANKHATOLA-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA-12TH-JUNE-2019'],
+      ['Nanhi Navya', '2019/06/NANHI-NAVYA-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA-11TH-JUNE-2019'],
+      ['Tumhari Hassi Ke Liye', '2019/06/TUMHARI-HASSI-KE-LIYE-Yaadon-Ka-Idiot-Box-with-Neelesh-Misra'],
+      ['Uss Ek Din', '2019/06/USS-EK-DIN-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA-7TH-JUNE'],
+      ['Vada Raha', '2019/06/VADA-RAHA-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA-6TH-JUNE'],
+      ['Yuh Hi Rehna', '2019/06/YUH-HI-REHNA-YAADON-KA-IDIOT-BOX-WITH-NEELESH-MISRA']
+  ];
   var PODCASTS = [
+    {name: 'Yaadon Ka Idiot Box', by: 'Big FM · Neelesh Misra\u2019s stories', eps: YKIB},
+    {name: 'Yaadon Ka Idiot Box · Season 1', by: 'opens YouTube · Neelesh Misra\u2019s playlist', yt: 'list=PL6BC2B76F17F751D0'},
     {name: 'Ek Kahani Aisi Bhi', by: 'Red FM · RJ Praveen’s late-night ghost stories', feed: 'https://omny.fm/shows/ek-kahani-aisi-bhi/playlists/podcast.rss'},
     {name: 'Ek Choti Si Horror Story', by: 'Red FM · RJ Mohnish', feed: 'https://omny.fm/shows/ek-choti-si-horror-story/playlists/podcast.rss'},
     {name: 'Red FM Bauaa', by: 'Red FM · RJ Raunac’s prank calls', feed: 'https://www.omnycontent.com/d/playlist/8ce708b9-c3c2-4eaa-a27d-ac0f007c53c5/232a6ee0-f0fb-4a77-a1cd-ac22009d88c7/8c8aa2ff-faca-4553-a635-ac22009d88d0/podcast.rss'},
@@ -1849,7 +1889,20 @@ var Custom = (function () {
   /** Opens a row that leads somewhere: saved, noise, a list, or a list's stations. */
   function openItem(it) {
     if (it.fm) { study.picker.stack.push({title: 'Indian FM', items: INDIAN_FM.map(function (f) { return {name: f.name, q: f.q + '&order=votes&reverse=true'}; }), sel: 0, note: ''}); return renderPicker(); }
-    if (it.pods) { study.picker.stack.push({title: 'Podcasts', items: PODCASTS.map(function (p) { return {name: p.name, meta: p.by, feed: p.feed}; }), sel: 0, note: ''}); return renderPicker(); }
+    if (it.pods) { study.picker.stack.push({title: 'Podcasts', items: PODCASTS.map(function (p) { return {name: p.name, meta: p.by, feed: p.feed, eps: p.eps, yt: p.yt}; }), sel: 0, note: ''}); return renderPicker(); }
+    if (it.eps) {
+      study.picker.stack.push({title: it.name, stations: true, episodes: true, sel: 0, note: '', items: it.eps.map(function (e) {
+        return {name: e[0], url: YKIB_BASE + e[1] + '.mp3', episode: true, meta: 'Big FM · 2019 · 27 min'};
+      })});
+      return renderPicker();
+    }
+    if (it.yt) {
+      // YouTube is its own app: Study's timer stops behind it, so say so before leaving
+      if (hooks.toast) hooks.toast('Opening YouTube · Study pauses while it\u2019s open');
+      if (!study.paused) { study.paused = true; study.pausedAt = Date.now(); pauseSound(); studyDraw(); }
+      TV.launch('youtube.leanback.v4', {contentTarget: it.yt}, function (ok) { if (!ok && hooks.toast) hooks.toast('Couldn\u2019t open YouTube.'); });
+      return;
+    }
     if (it.search) { study.picker.stack.push({title: 'Search stations', items: [], sel: 0, search: true, text: '', note: 'Type a station name, then OK.'}); return renderPicker(); }
     if (it.feed) return openFeed(it);
     var v = {title: it.name, items: [], sel: 0, note: '', stations: !it.list};
