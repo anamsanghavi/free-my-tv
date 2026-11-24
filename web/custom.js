@@ -1215,7 +1215,7 @@ var Custom = (function () {
   }
 
   // Study: 25 minutes focus, 5 minutes break, with instrumental radio playing here (so the timer stays on screen)
-  var study = null;
+  var study = null, RING_C = 1646;   // RING_C: the ring's length, 2 \u00D7 \u03C0 \u00D7 262
 
   function chime() {
     try {
@@ -1239,6 +1239,7 @@ var Custom = (function () {
   function studyDraw() {
     var s = $('study');
     if (!study || !s) return;
+    if (study.radio && study.picker && !view().search && Date.now() - (study.pickAt || 0) > 10000) closePicker();   // Radio: the list goes after 10 s
     if (study.radio) {
       var snd = study.current || SILENCE;
       s.querySelector('.phase').textContent = study.paused ? 'Paused' : (snd.url || snd.noise ? 'Now playing' : 'Radio');
@@ -1252,10 +1253,12 @@ var Custom = (function () {
     var gone = Math.floor(((study.paused ? study.pausedAt : Date.now()) - study.start) / 1000);
     var left = Math.max(0, study.length - gone);
     s.querySelector('.time').textContent = Math.floor(left / 60) + ':' + pad(left % 60);
-    s.querySelector('.phase').textContent = study.focus ? 'Focus' : 'Break · stretch, water, look away';
-    var dots = '';
-    for (var i = 0; i < 4; i++) dots += i < (study.done % 4) ? '●' : '○';
-    s.querySelector('.dots').textContent = dots;
+    s.querySelector('.phase').textContent = study.focus ? 'Focus \u00B7 session ' + (study.done % 4 + 1) + ' of 4' : 'Break \u00B7 stretch, water, look away';
+    var ends = new Date(Date.now() + left * 1000), eh = ends.getHours() % 12 || 12;
+    s.querySelector('.dots').textContent = (study.paused ? 'Paused' : (study.focus ? 'Break at ' : 'Back to focus at ') + eh + ':' + pad(ends.getMinutes()));
+    var arc = s.querySelector('.ring .arc');
+    if (arc) arc.setAttribute('stroke-dashoffset', String(Math.round(RING_C * Math.min(1, gone / study.length))));
+    setClass(s, 'brk', !study.focus);
     setClass(s, 'paused', study.paused);
     s.querySelector('.hint').textContent = (study.paused ? 'Paused · OK to carry on' : 'OK to pause') + (study.radioOn ? '  ·  ↑ ↓ saved sounds  ·  ← more sounds' : '  ·  ← radio') + '  ·  → skip  ·  Back to leave';
     if (!study.paused && left === 0) { studyNext(); studyDraw(); }
@@ -1839,6 +1842,25 @@ var Custom = (function () {
     var mc = el('canvas', 'mk', s);
     mc.width = MK_W;
     mc.height = MK_H;
+    el('div', 'npcard', s);   // Cinema glass: the now-playing card behind the station's name (Radio)
+    if (!radio) {
+      // Cinema glass: a ring that empties as the session runs (studyDraw sets how much)
+      var NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('class', 'ring');
+      svg.setAttribute('width', '560');
+      svg.setAttribute('height', '560');
+      svg.setAttribute('viewBox', '0 0 560 560');
+      for (var ci = 0; ci < 2; ci++) {
+        var c = document.createElementNS(NS, 'circle');
+        c.setAttribute('cx', '280');
+        c.setAttribute('cy', '280');
+        c.setAttribute('r', '262');
+        c.setAttribute('class', ci ? 'arc' : 'track');
+        if (ci) { c.setAttribute('stroke-dasharray', String(RING_C)); c.setAttribute('transform', 'rotate(-90 280 280)'); }
+        svg.appendChild(c);
+      }
+      s.appendChild(svg);
+    }
     el('div', 'phase', s);
     el('div', 'time', s);
     el('div', 'dots', s);
@@ -1854,7 +1876,7 @@ var Custom = (function () {
       freq: new Uint8Array(256), wave: new Uint8Array(512), peaks: []};
     study.radio = !!radio;
     study.radioOn = radio || stored('studyRadio') !== false;
-    if (!study.radioOn) study.visMode = 'off';
+    if (!study.radioOn || !radio) study.visMode = 'off';   // Study: the dimmed diorama behind the timer, not visuals (Cinema glass)
     playSound(study.radioOn ? stored('studyNow') || savedSounds()[0] || SILENCE : SILENCE);
     visStart();
     setClass(s, 'radio-off', !study.radioOn);
@@ -2171,6 +2193,7 @@ var Custom = (function () {
   }
 
   function pickerKey(k, keys) {
+    study.pickAt = Date.now();
     var v = view(), n = v.items.length;
     if (v.search) {
       var f = $('study').querySelector('.picker .srch');
@@ -2242,7 +2265,7 @@ var Custom = (function () {
       else { visStep(); studyDraw(); }
       return true;
     }
-    if (k === keys.left) { openPicker(); return true; }
+    if (k === keys.left) { study.pickAt = Date.now(); openPicker(); return true; }
     if (k === keys.up || k === keys.down) { if (study.radioOn) cycleSaved(k === keys.up ? -1 : 1); return true; }
     return true;   // everything else stays in Study
   }
@@ -2404,10 +2427,7 @@ var Custom = (function () {
       var info = el('div', 'g-info', card);
       el('div', 'kicker', info, 'Guest Wi-Fi');
       el('div', 'ssid', info, wifi.ssid);
-      if (wifi.sec !== 'nopass') {
-        el('div', 'g-label', info, 'Password');
-        el('div', 'pass', info, wifi.pass);
-      }
+      // the code only: the password isn't shown on screen (asked for, Nov 2026)
       el('div', 'how', info, 'Point your phone’s camera at the code to join.');
       el('div', 'hint', o, 'OK to change the network  ·  Back to close');
       return;
@@ -2607,7 +2627,7 @@ var Custom = (function () {
   }
 
   // MARK: - Antakshari: two teams take turns. Each turn has three steps, and the screen always says what to press:
-  //   1. think:  the letter, and 30 seconds to start singing a song that begins with it
+  //   1. think:  the letter, and 60 seconds to start singing a song that begins with it
   //   2. sing:   the clock stops; they sing as long as they like; OK when they finish (a point), or ◀ if it didn't count
   //   3. next:   the next letter (the classic rule: the song's last letter, set with ▲▼), then OK hands over
 
@@ -2615,7 +2635,7 @@ var Custom = (function () {
   var LETTERS = ['K', 'K', 'K', 'M', 'M', 'M', 'T', 'T', 'D', 'D', 'P', 'P', 'B', 'B', 'J', 'J', 'H', 'H', 'S', 'S', 'Y', 'Y', 'A', 'A',
     'Ch', 'G', 'N', 'R', 'L', 'Bh', 'Dh', 'Kh', 'Ph', 'Sh', 'Th', 'Z', 'O', 'E', 'V', 'Gh'];
   var ALL_LETTERS = (function () { var u = []; for (var i = 0; i < LETTERS.length; i++) if (u.indexOf(LETTERS[i]) < 0) u.push(LETTERS[i]); return u.sort(); })();
-  var THINK = 30;
+  var THINK = 60;   // a minute to think of a song (asked for, Nov 2026)
   var game = null;
 
   function beep(f, len, vol, type, delay) {

@@ -960,3 +960,85 @@ html.glass #stage.ink-notice-d #alertbar .k, html.glass #stage:not(.ink-notice-d
   background: #1C202A center / cover no-repeat; -webkit-transition: -webkit-transform 0.15s ease; transition: transform 0.15s ease; }
 #overlay.movies.gl .pc.focus { outline: 4px solid #FFFFFF; outline-offset: 4px; -webkit-transform: scale(1.06); transform: scale(1.06); }
 #overlay.movies.gl .hint { position: absolute; left: 96px; bottom: 40px; font-size: 20px; color: rgba(245, 245, 247, 0.5); }
+
+/* ---- Cinema glass, stage 3: Study (a ring timer over the dimmed diorama), Radio (a now-playing card, the list on
+   demand), Antakshari and Guest Wi-Fi (a centred glass card, the code only) ---- */
+html.glass #study, html.glass #overlay.game, html.glass #overlay.guest { font-family: 'Inter', 'Mukta', Helvetica, Arial, sans-serif; -webkit-font-feature-settings: 'tnum'; font-feature-settings: 'tnum'; }
+html.glass #study { background: radial-gradient(ellipse at 50% 45%, rgba(5, 7, 12, 0.4) 0%, rgba(5, 7, 12, 0.86) 75%); color: #F5F5F7; }
+html.glass #study.radio { background: #06070B; }
+html.glass #study .ring { position: absolute; left: 680px; top: 130px; }
+html.glass #study .ring .track { fill: rgba(22, 26, 36, 0.55); stroke: rgba(255, 255, 255, 0.12); stroke-width: 10; }
+html.glass #study .ring .arc { fill: none; stroke: #9FE3DC; stroke-width: 10; stroke-linecap: round; }
+html.glass #study.brk .ring .arc { stroke: #F2C46B; }
+html.glass #study.paused .ring .arc { stroke: rgba(245, 245, 247, 0.35); }
+html.glass #study:not(.radio) .phase { top: 290px; font-size: 22px; font-style: normal; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #9FE3DC; }
+html.glass #study.brk:not(.radio) .phase { color: #F2C46B; }
+html.glass #study:not(.radio) .time { top: 338px; font-size: 158px; font-weight: 200; letter-spacing: -0.04em; }
+html.glass #study:not(.radio) .dots { top: 540px; font-size: 26px; letter-spacing: 0; color: rgba(245, 245, 247, 0.7); }
+html.glass #study:not(.radio) .music { left: 410px; right: 410px; bottom: 120px; padding: 24px 30px; border-radius: 26px; font-size: 26px; opacity: 1;
+  background: rgba(22, 26, 36, 0.68); border: 1px solid rgba(255, 255, 255, 0.14); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.glass #study .hint { bottom: 64px; font-size: 22px; opacity: 0.55; }
+html.glass #study.picking .ring { -webkit-transform: translateX(-330px); transform: translateX(-330px); }
+html.glass #study .ring { -webkit-transition: -webkit-transform 0.3s ease; transition: transform 0.3s ease; }
+html.glass #study .npcard { display: none; }
+/* Radio: the now-playing card bottom left */
+html.glass #study.radio .npcard { display: block; position: absolute; left: 96px; bottom: 72px; width: 900px; height: 268px; box-sizing: border-box;
+  border-radius: 26px; background: rgba(22, 26, 36, 0.68); border: 1px solid rgba(255, 255, 255, 0.14); }
+html.glass #study.radio .phase { left: 132px; right: auto; top: auto; bottom: 270px; text-align: left; font-size: 20px; font-style: normal; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245, 245, 247, 0.65); }
+html.glass #study.radio .time, html.glass.ed #study.radio .time { left: 128px; right: auto; top: auto; bottom: 186px; width: 830px; padding: 0; text-align: left;
+  font-size: 54px; font-weight: 600; letter-spacing: -0.02em; }
+html.glass #study.radio .music { left: 132px; right: auto; bottom: 140px; width: 830px; text-align: left; font-size: 22px; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.glass #study.radio .hint { left: 132px; right: auto; bottom: 96px; width: 830px; text-align: left; font-size: 20px; }
+html.glass #study.radio.picking .phase, html.glass #study.radio.picking .time, html.glass #study.radio.picking .music, html.glass #study.radio.picking .hint { -webkit-transform: none; transform: none; padding: 0; }
+html.glass #study.vis-on .phase, html.glass #study.vis-on .time, html.glass #study.vis-on .music, html.glass #study.vis-on .hint { text-shadow: none; }
+/* the station list: a glass panel on the right */
+html.glass #study .picker { left: auto; right: 64px; top: 64px; height: 952px; width: 640px; border-radius: 28px; overflow: hidden;
+  background: rgba(18, 21, 30, 0.86); border: 1px solid rgba(255, 255, 255, 0.14); }
+html.glass #study .picker .ttl { padding: 30px 40px 16px; font-size: 32px; font-weight: 600; color: #F5F5F7; }
+html.glass #study .picker .row { height: 60px; line-height: 60px; margin: 0 18px; padding: 0 22px; border-radius: 14px; font-size: 26px; opacity: 1; color: rgba(245, 245, 247, 0.9); }
+html.glass #study .picker .row.sel { background: #F5F5F7; color: #0B0D12; font-weight: 600; }
+html.glass #study .picker .row .m { font-size: 20px; opacity: 0.6; }
+html.glass #study .picker .note, html.glass #study .picker .ph { font-size: 20px; }
+html.glass #study .picker .srch { border-radius: 14px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); color: #F5F5F7; }
+
+/* Antakshari: the scores as glass cards in the corners, the letter in its ring, the keys as pills */
+html.glass #overlay.game { background: radial-gradient(ellipse at 50% 50%, rgba(5, 7, 12, 0.35) 0%, rgba(5, 7, 12, 0.88) 70%); color: #F5F5F7; }
+html.glass #overlay.game .teams { left: 96px; right: 96px; top: 64px; text-align: left; overflow: hidden; }
+html.glass #overlay.game .team { float: left; width: 420px; margin: 0; padding: 24px 30px; box-sizing: border-box; border-radius: 26px; text-align: left; opacity: 0.6;
+  background: rgba(22, 26, 36, 0.66) !important; border: 1px solid rgba(255, 255, 255, 0.14); }
+html.glass #overlay.game .team + .team { float: right; }
+html.glass #overlay.game .team.now { opacity: 1; border-color: rgba(159, 227, 220, 0.6); }
+html.glass #overlay.game .team .name { font-size: 20px; letter-spacing: 0.16em; color: rgba(245, 245, 247, 0.7); }
+html.glass #overlay.game .team.now .name { color: #9FE3DC; }
+html.glass #overlay.game .team .score { font-size: 96px; font-weight: 200; line-height: 1.05; }
+html.glass #overlay.game .turn { color: #9FE3DC; font-size: 22px; font-weight: 600; letter-spacing: 0.16em; }
+html.glass #overlay.game .letter { font-weight: 600; letter-spacing: -0.03em; }
+html.glass #overlay.game .sub { font-style: normal; color: rgba(245, 245, 247, 0.85); }
+html.glass #overlay.game .cta { margin: 0 9px; padding: 16px 28px 16px 16px; border-radius: 999px; font-size: 24px; font-weight: 400; color: #F5F5F7;
+  background: rgba(255, 255, 255, 0.08) !important; border: 1px solid rgba(255, 255, 255, 0.16); }
+html.glass #overlay.game .cta.main { background: #F5F5F7 !important; border-color: #F5F5F7; color: #0B0D12; font-size: 26px; font-weight: 600; }
+html.glass #overlay.game .cta .keycap { margin-right: 12px; padding: 6px 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.35); font-size: 18px;
+  letter-spacing: 0.04em; color: inherit; vertical-align: 1px; }
+html.glass #overlay.game .cta.main .keycap { border-color: rgba(11, 13, 18, 0.4); color: #0B0D12; }
+
+/* Guest Wi-Fi: a centred glass card with the code */
+html.glass #overlay.guest, html.glass .night #overlay.guest { background: rgba(5, 7, 12, 0.58) !important; color: #F5F5F7 !important; }
+html.glass #overlay.guest .card, html.glass .night #overlay.guest .card { left: 50%; top: 50%; width: 1200px; height: 640px; margin: -320px 0 0 -600px; padding: 0;
+  border-radius: 36px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(22, 26, 36, 0.78) !important; box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5) !important; }
+html.glass #overlay.guest .qr { left: 56px; top: 100px; width: 440px; height: 440px; border-radius: 28px; }
+html.glass #overlay.guest .g-info { left: 556px; right: 56px; top: 110px; }
+html.glass #overlay.guest .g-info .kicker, html.glass #overlay.guest .g-form .kicker { position: static; font-size: 20px; font-weight: 600; line-height: 1.2;
+  letter-spacing: 0.16em; text-transform: uppercase; color: #9FE3DC; }
+html.glass #overlay.guest .ssid { position: static; margin-top: 24px; font-size: 56px; font-weight: 300; }
+html.glass #overlay.guest .ssid::before { content: 'Network'; display: block; margin-bottom: 8px; font-size: 20px; letter-spacing: 0.16em; font-weight: 600; color: rgba(245, 245, 247, 0.6); }
+html.glass #overlay.guest .how { position: static; margin-top: 40px; font-size: 30px; font-style: normal; color: rgba(245, 245, 247, 0.85); }
+html.glass #overlay.guest > .hint { left: 0; right: 0; width: auto; bottom: 120px; text-align: center; font-size: 22px; color: rgba(245, 245, 247, 0.6); }
+html.glass #overlay.guest .g-form { left: 64px; right: 64px; top: 52px; }
+html.glass #overlay.guest .lead { position: static; margin: 12px 0 26px; font-size: 26px; font-style: normal; color: rgba(245, 245, 247, 0.75); }
+html.glass #overlay.guest .g-form .g-row:first-of-type { margin-top: 0; }
+html.glass #overlay.guest .g-row, html.glass .night #overlay.guest .g-row { padding: 12px 22px; margin-bottom: 12px; border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); }
+html.glass #overlay.guest .g-row .g-name { font-size: 22px; opacity: 0.7; }
+html.glass #overlay.guest .g-row input { font-size: 30px; color: #F5F5F7; }
+html.glass #overlay.guest .g-row.focus, html.glass .night #overlay.guest .g-row.focus { border-color: #F5F5F7; background: rgba(255, 255, 255, 0.14); }
