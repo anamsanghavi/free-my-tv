@@ -2372,6 +2372,21 @@ var Custom = (function () {
       }
     } else el('div', 'dim', sw, 'No weather right now');
 
+    // Scores (left, under the weather)
+    refreshScores();
+    refreshRates();
+    var sc = el('div', 'tcard scores', left);
+    el('div', 'kicker', sc, 'Scores');
+    if (!scores.rows) el('div', 'dim', sc, 'Finding today\u2019s games\u2026');
+    else if (!scores.rows.length) el('div', 'dim', sc, 'No games to show right now');
+    for (i = 0; scores.rows && i < scores.rows.length; i++) {
+      var g = scores.rows[i], gr = el('div', 'grow', sc), gl = el('div', 'gl', gr);
+      if (g.live) el('span', 'live', gl, 'LIVE');
+      gl.appendChild(document.createTextNode(g.title));
+      el('div', 'gs', gl, g.sport + (g.sub ? ' \u00B7 ' + g.sub : ''));
+      el('div', 'gv', gr, g.score);
+    }
+
     var sf = el('div', 'tcard film', right);
     var fr = el('div', 'frow', sf), poster = el('div', 'poster', fr), ft = el('div', 'ftext', fr);
     el('div', 'kicker', ft, 'Film of the day');
@@ -2383,6 +2398,22 @@ var Custom = (function () {
       el('div', 'dim', ft, (film.year ? film.year + ' · ' : '') + (film.where.length ? film.where.slice(0, 2).join(', ') :
         film.rent ? 'to rent or buy' : 'not streaming here'));
     }
+
+    // Rupee & gold
+    var rg = el('div', 'tcard rates', right);
+    el('div', 'kicker', rg, 'Rupee & gold');
+    var rl = [];
+    if (rates.cad) rl.push(['1 Canadian dollar', rupees(rates.cad, 2), rates.cadChg]);
+    if (rates.usd) rl.push(['1 US dollar', rupees(rates.usd, 2), rates.usdChg]);
+    if (rates.goldOz && rates.usd) rl.push(['Gold \u00B7 24k, 10 g', rupees(rates.goldOz * rates.usd / 31.1035 * 10, 0), rates.goldChg]);
+    if (!rl.length) el('div', 'dim', rg, 'Finding today\u2019s rates\u2026');
+    for (i = 0; i < rl.length; i++) {
+      var rr = el('div', 'grow', rg);
+      el('div', 'gl', rr, rl[i][0]);
+      var gv = el('div', 'gv', rr, rl[i][1] + ' ');
+      el('span', rl[i][2] >= 0 ? 'up' : 'down', gv, change(rl[i][2]));
+    }
+    if (rl.length) el('div', 'note', rg, 'Change since the day before \u00B7 gold at the world price, before India\u2019s duty and GST');
 
     var ss = el('div', 'tcard sky', right), lines = [];
     el('div', 'kicker', ss, night ? 'Tonight’s sky' : 'The sky');
@@ -2509,6 +2540,124 @@ var Custom = (function () {
     }
     return true;
   }
+
+  // MARK: - Today's scores and rates (Cinema glass, Nov 2026). Scores from ESPN's public scoreboards (cricket: India's
+  // match first; football: the big leagues; F1; tennis), every 2 minutes while Today is open. Rupee rates from the
+  // European Central Bank (Frankfurter), every 6 hours. Gold from Binance's PAXG (a token backed by one troy ounce of
+  // gold), every 10 minutes: the world price in rupees, before India's import duty and GST, which local rates include.
+
+  var scores = {at: 0, rows: null}, rates = {fxAt: 0, goldAt: 0, cad: 0, usd: 0, cadChg: 0, usdChg: 0, gold: 0, goldChg: 0};
+  var ESPN = 'https://site.web.api.espn.com/apis/v2/scoreboard/header?lang=en&region=in&sport=';
+  var FOOTBALL = ['eng.1', 'uefa.champions', 'esp.1', 'ind.1', 'ger.1', 'ita.1', 'fifa.world', 'usa.1'];
+
+  function espnEvents(sport, done) {
+    get(ESPN + sport, {Accept: 'application/json'}, function (err, body) {
+      var out = [];
+      var lg = !err && body && body.sports && body.sports[0] ? body.sports[0].leagues || [] : [];
+      for (var i = 0; i < lg.length; i++) for (var j = 0; lg[i].events && j < lg[i].events.length; j++) { lg[i].events[j].league = lg[i].slug; out.push(lg[i].events[j]); }
+      done(out);
+    }, 10000);
+  }
+
+  function when(iso) {
+    var t = Date.parse(iso), d = new Date(t), now = new Date();
+    if (isNaN(t)) return '';
+    return (d.toDateString() === now.toDateString() ? 'Today ' : Data.weekday(t) + ' ') + Data.time(t);
+  }
+
+  /** One line for a match: live first, then soonest to start, then the latest result. */
+  function bestEvent(list) {
+    var rank = function (e) { return e.status === 'in' ? 0 : e.status === 'pre' ? 1 : 2; };
+    list.sort(function (a, b) { return rank(a) - rank(b) || (rank(a) === 2 ? Date.parse(b.date) - Date.parse(a.date) : Date.parse(a.date) - Date.parse(b.date)); });
+    return list[0] || null;
+  }
+
+  function eventRow(sport, e) {
+    var c = e.competitors || [], names = c.map(function (x) { return x.abbreviation && x.abbreviation.length <= 12 ? x.abbreviation : (x.displayName || x.name || ''); });
+    var row = {sport: sport, live: e.status === 'in', title: names.length === 2 ? names[0] + ' v ' + names[1] : (e.shortName || e.name || '')};
+    if (e.status === 'pre') { row.sub = when(e.date); row.score = ''; }
+    else { row.sub = e.summary || (e.fullStatus && e.fullStatus.type && e.fullStatus.type.shortDetail) || ''; row.score = sport === 'Tennis' ? (c[0] && c[0].score) || '' : sport === 'Cricket' ? c.filter(function (x) { return x.score; }).map(function (x) { return x.score; }).join('  \u00B7  ') : c.map(function (x) { return x.score || '0'; }).join(' \u2013 '); }
+    return row;
+  }
+
+  function refreshScores() {
+    if (Date.now() - scores.at < 120000) return;
+    scores.at = Date.now();
+    var got = {}, left = 4;
+    function one() {
+      if (--left) return;
+      scores.rows = [got.cricket, got.football, got.f1, got.tennis].filter(function (r) { return r; });
+      if (overlay === 'today') renderToday();
+    }
+    espnEvents('cricket', function (ev) {
+      var india = ev.filter(function (e) { return /india/i.test(e.name || '') || (e.competitors || []).some(function (c) { return /^india$/i.test(c.displayName || ''); }); });
+      var e = bestEvent(india.length ? india : ev.filter(function (x) { return x.status === 'in'; }));
+      if (e) got.cricket = eventRow('Cricket', e);
+      one();
+    });
+    espnEvents('soccer', function (ev) {
+      var e = null;
+      for (var i = 0; i < FOOTBALL.length && !e; i++) e = bestEvent(ev.filter(function (x) { return x.league === FOOTBALL[i]; }));
+      if (e) got.football = eventRow('Football', e);
+      one();
+    });
+    espnEvents('tennis', function (ev) {
+      var e = bestEvent(ev.filter(function (x) { return x.league === 'atp'; })) || bestEvent(ev);
+      if (e) got.tennis = eventRow('Tennis', e);
+      one();
+    });
+    get('https://site.api.espn.com/apis/site/v2/sports/racing/f1/scoreboard', {Accept: 'application/json'}, function (err, body) {
+      var e = !err && body && body.events && body.events[0];
+      if (e) {
+        var cs = e.competitions || [], next = null, race = cs[cs.length - 1];
+        for (var i = 0; i < cs.length && !next; i++) if (cs[i].status && cs[i].status.type && cs[i].status.type.state !== 'post') next = cs[i];
+        var name = String(e.name || '').replace(/^\S+\s(?=\S+.*Grand Prix)/, '').replace(/^Heineken |^Aramco |^Qatar Airways |^Pirelli /, '');
+        var row = {sport: 'F1', live: !!(next && next.status.type.state === 'in'), title: name.replace(/Grand Prix/, 'GP')};
+        if (next) { row.sub = (next.type && next.type.abbreviation === 'Qual' ? 'Qualifying' : next.type && next.type.abbreviation === 'Race' ? 'Race' : (next.type && next.type.abbreviation) || ''); row.score = row.live ? 'live' : when(next.date); }
+        else {
+          var win = (race && race.competitors || []).filter(function (p) { return p.order === 1; })[0];
+          row.sub = 'Race result'; row.score = win && win.athlete ? 'Won: ' + String(win.athlete.displayName).split(' ').pop() : '';
+        }
+        got.f1 = row;
+      }
+      one();
+    }, 10000);
+  }
+
+  function refreshRates() {
+    var now = Date.now();
+    if (now - rates.fxAt > 6 * 3600000) {
+      rates.fxAt = now;
+      get('https://api.frankfurter.dev/v1/' + isoDay(-8) + '..?base=INR&symbols=CAD,USD', {Accept: 'application/json'}, function (err, body) {
+        var days = !err && body && body.rates ? Object.keys(body.rates).sort() : [];
+        if (days.length) {
+          var a = body.rates[days[days.length - 1]], b = body.rates[days[Math.max(0, days.length - 2)]];
+          rates.cad = 1 / a.CAD; rates.usd = 1 / a.USD;
+          rates.cadChg = (b.CAD / a.CAD - 1) * 100; rates.usdChg = (b.USD / a.USD - 1) * 100;
+          rates.fxDay = days[days.length - 1];
+        } else rates.fxAt = 0;
+        if (overlay === 'today') renderToday();
+      }, 10000);
+    }
+    if (now - rates.goldAt > 10 * 60000) {
+      rates.goldAt = now;
+      get('https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT', {}, function (err, body) {
+        if (!err && body && body.lastPrice) { rates.goldOz = parseFloat(body.lastPrice); rates.goldChg = parseFloat(body.priceChangePercent) || 0; }
+        else rates.goldAt = 0;
+        if (overlay === 'today') renderToday();
+      }, 10000);
+    }
+  }
+
+  function rupees(v, digits) {
+    var n = Math.round(v * Math.pow(10, digits)) / Math.pow(10, digits), s = n.toFixed(digits), p = s.split('.'), x = p[0];
+    // Indian grouping: 12,34,567
+    var last = x.slice(-3), rest = x.slice(0, -3);
+    if (rest) last = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + last;
+    return '₹' + last + (p[1] ? '.' + p[1] : '');
+  }
+
+  function change(v) { return (v >= 0 ? '▲ ' : '▼ ') + Math.abs(v).toFixed(2) + '%'; }
 
   // MARK: - Movie night (Cinema glass): films new on the TV's services in Canada, and Bollywood, from TMDB. A big film
   // up top (its backdrop behind), a poster row below. ← → move along the row, ↑ ↓ change the row, OK opens the film's
