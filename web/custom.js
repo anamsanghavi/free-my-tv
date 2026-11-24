@@ -81,7 +81,18 @@ var Custom = (function () {
   ];
   var PODCASTS = [
     {name: 'Yaadon Ka Idiot Box', by: 'Big FM · Neelesh Misra\u2019s stories', eps: YKIB},
-    {name: 'Yaadon Ka Idiot Box · Season 1', by: 'opens YouTube · Neelesh Misra\u2019s playlist', yt: 'list=PL6BC2B76F17F751D0'},
+    {name: 'Yaadon Ka Idiot Box · every season', by: 'opens YouTube · Neelesh Misra\u2019s channel', yts: [
+      ['Season 1', '58 stories', '_0jDxV4WtXU', 'PL6BC2B76F17F751D0'],
+      ['Season 2', '207 stories', '_KpD0aPwqhY', 'PL33C4CB0A430B8DD1'],
+      ['Season 3', '224 stories', '-7oelkGlhcM', 'PLRknjC5MPHa0ORz6ublg_ll9OciXprAjA'],
+      ['Season 4', '', 'kz0h9N9dA1Q', 'PLRknjC5MPHa29hPAM0Mg1IfFEUuFkqeBx'],
+      ['Season 5', '695 stories', '3OvBiWo6QdE', 'PLRknjC5MPHa3o-pxq8q30S-gaTvdHsqAT'],
+      ['Season 6', '', 'kjhDQfqfZUo', 'PLRknjC5MPHa1QqiV4Ja3YsS9eKH4_wJiC'],
+      ['Season 7', '104 stories', 'BXwb6X0bGQA', 'PLRknjC5MPHa34ataIPLk4WG_yKfmkRB3D'],
+      ['Family stories', '46 stories', 'C5y6AK88trs', 'PLRknjC5MPHa3ayTbOhop7FmvcdlUCSR5m'],
+      ['Romantic stories', '76 stories', 'Z59F4EeIiV8', 'PLRknjC5MPHa2AN7TXgSHdA0Eb07A2XmwS'],
+      ['Inspirational stories', '45 stories', 'Y4mJ9_i6xA8', 'PLRknjC5MPHa21LB-CqSvncQnTbTs_DNQG']
+    ]},
     {name: 'Ek Kahani Aisi Bhi', by: 'Red FM · RJ Praveen’s late-night ghost stories', feed: 'https://omny.fm/shows/ek-kahani-aisi-bhi/playlists/podcast.rss'},
     {name: 'Ek Choti Si Horror Story', by: 'Red FM · RJ Mohnish', feed: 'https://omny.fm/shows/ek-choti-si-horror-story/playlists/podcast.rss'},
     {name: 'Red FM Bauaa', by: 'Red FM · RJ Raunac’s prank calls', feed: 'https://www.omnycontent.com/d/playlist/8ce708b9-c3c2-4eaa-a27d-ac0f007c53c5/232a6ee0-f0fb-4a77-a1cd-ac22009d88c7/8c8aa2ff-faca-4553-a635-ac22009d88d0/podcast.rss'},
@@ -1889,11 +1900,16 @@ var Custom = (function () {
   /** Opens a row that leads somewhere: saved, noise, a list, or a list's stations. */
   function openItem(it) {
     if (it.fm) { study.picker.stack.push({title: 'Indian FM', items: INDIAN_FM.map(function (f) { return {name: f.name, q: f.q + '&order=votes&reverse=true'}; }), sel: 0, note: ''}); return renderPicker(); }
-    if (it.pods) { study.picker.stack.push({title: 'Podcasts', items: PODCASTS.map(function (p) { return {name: p.name, meta: p.by, feed: p.feed, eps: p.eps, yt: p.yt}; }), sel: 0, note: ''}); return renderPicker(); }
+    if (it.pods) { study.picker.stack.push({title: 'Podcasts', items: PODCASTS.map(function (p) { return {name: p.name, meta: p.by, feed: p.feed, eps: p.eps, yt: p.yt, yts: p.yts}; }), sel: 0, note: ''}); return renderPicker(); }
     if (it.eps) {
       study.picker.stack.push({title: it.name, stations: true, episodes: true, sel: 0, note: '', items: it.eps.map(function (e) {
         return {name: e[0], url: YKIB_BASE + e[1] + '.mp3', episode: true, meta: 'Big FM · 2019 · 27 min'};
       })});
+      return renderPicker();
+    }
+    if (it.yts) {
+      study.picker.stack.push({title: 'Yaadon Ka Idiot Box', sel: 0, note: 'These open in the YouTube app: Study pauses while it\u2019s open.',
+        items: it.yts.map(function (y) { return {name: y[0], meta: y[1], yt: 'v=' + y[2] + '&list=' + y[3]}; })});
       return renderPicker();
     }
     if (it.yt) {
