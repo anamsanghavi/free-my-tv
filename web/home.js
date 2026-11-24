@@ -683,7 +683,7 @@
     var wxNow = wxWords(' ', false);
     if (wxNow) el('span', 'dwx', r.children[0], wxNow);   // the weather on the date's line, after a dot (custom.css)
     r.children[1].textContent = formatDate('format|h:mm', now);
-    r.children[2].textContent = '';
+    r.children[2].textContent = wxWords(' \u00B7 ', true);   // Cinema glass: the weather as a pill (custom.css)
     var mc = m.querySelector('.mclock');
     mc.children[0].textContent = formatDate('format|h:mm', now);
     var wx = wxWords(', ', true);
@@ -708,9 +708,14 @@
       var col = el('div', 'col', m), mc = el('div', 'mclock', col);
       el('div', 't', mc);
       el('div', 's', mc);
-      el('div', 'mapps', col);
-      el('div', 'mmodes', col);
-      el('div', 'mtools', col);
+      // Cinema glass: the apps, the modes and the tools sit in one glass dock along the bottom (custom.css)
+      var dock = el('div', 'dock', col);
+      el('div', 'dl', dock, 'Recently used');
+      el('div', 'mapps', dock);
+      var mrow = el('div', 'mrow', dock), mm = el('div', 'mmw', mrow);
+      el('div', 'dl', mm, 'Modes');
+      el('div', 'mmodes', mm);
+      el('div', 'mtools', mrow);
       el('div', 'mfly', m);
       stage.insertBefore(m, $('drawer'));
     }
@@ -754,6 +759,7 @@
       hover(t, Z.DRAWER, ix);
     }
     fly.innerHTML = '';
+    tools.appendChild(fly);   // above the Inputs tool, the first one (custom.css places it)
     el('div', 'ft', fly, tr('Inputs'));
     for (i = 0; i < drawerInputs; i++) {
       var fi = el('div', 'fi' + (drawerItems[i].off ? ' off' : ''), fly, I18N.name(drawerItems[i].label));
@@ -810,7 +816,26 @@
     updateFocus();
   }
 
+  // Local addition: when each shelf app was last opened (this TV only), so the menu's dock shows the latest first
+  function noteUse(id) {
+    var used;
+    try { used = JSON.parse(localStorage.getItem('fmtv.used') || '{}'); } catch (e) { used = {}; }
+    used[id] = Date.now();
+    try { localStorage.setItem('fmtv.used', JSON.stringify(used)); } catch (e) {}
+  }
+
+  function byRecentUse() {
+    var used = {};
+    try { used = JSON.parse(localStorage.getItem('fmtv.used') || '{}'); } catch (e) {}
+    var before = shelf.map(function (a) { return a.id; }).join(',');
+    var order = shelf.map(function (a, i) { return {a: a, i: i, t: used[a.id] || 0}; });
+    order.sort(function (x, y) { return y.t - x.t || x.i - y.i; });
+    shelf = order.map(function (o) { return o.a; });
+    if (shelf.map(function (a) { return a.id; }).join(',') !== before) renderShelf();
+  }
+
   function wakeMenu() {
+    byRecentUse();
     menuOn = true;
     menuFirst = 0;
     menuFly = false;
@@ -835,29 +860,18 @@
    * Wi-Fi, All Apps, Settings). OK on Inputs folds its list out beside the column: ↑ ↓ there, ← or Back folds it away.
    */
   function menuMove(dx, dy) {
-    var COLS = 3, p, t, n = menuModes.length;
+    // Cinema glass: the apps run across the dock; under them one row of modes then tools. Inputs folds its list up.
+    var row = menuModes.concat(menuTools), p;
     if (st.zone === Z.SHELF) {
-      if (dy > 0 && st.shelf >= shelf.length - 1) { st.zone = Z.DRAWER; st.drawer = n ? menuModes[0] : menuTools[0]; }
-      else if (dy) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dy));
+      if (dx) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dx));
+      else if (dy > 0 && row.length) { st.zone = Z.DRAWER; st.drawer = row[0]; }
     } else if (menuFly) {
       if (dy) st.drawer = Math.max(0, Math.min(drawerInputs - 1, st.drawer + dy));
-      else if (dx < 0) { closeFly(); return; }
-    } else if ((p = menuModes.indexOf(st.drawer)) >= 0) {
-      if (dx) { var q = p + dx; if (q >= 0 && q < n && Math.floor(q / COLS) === Math.floor(p / COLS)) st.drawer = menuModes[q]; }
-      else if (dy < 0) { if (p >= COLS) st.drawer = menuModes[p - COLS]; else if (shelf.length) { st.zone = Z.SHELF; st.shelf = shelf.length - 1; } }
-      else if (dy > 0) {
-        if (p + COLS < n) st.drawer = menuModes[p + COLS];
-        else if (menuTools.length) st.drawer = menuTools[Math.min(menuTools.length - 1, Math.round((p % COLS) * (menuTools.length - 1) / (COLS - 1)))];
-      }
-    } else if ((t = menuTools.indexOf(st.drawer)) >= 0) {
-      if (dx) st.drawer = menuTools[Math.max(0, Math.min(menuTools.length - 1, t + dx))];
-      else if (dy < 0) {
-        if (n) {
-          var last = Math.floor((n - 1) / COLS) * COLS, col = Math.round(t * (COLS - 1) / Math.max(1, menuTools.length - 1));
-          st.drawer = menuModes[Math.min(n - 1, last + col)];
-        } else if (shelf.length) { st.zone = Z.SHELF; st.shelf = shelf.length - 1; }
-      }
-    } else st.drawer = n ? menuModes[0] : menuTools[0];
+      else if (dx) { closeFly(); return; }
+    } else if ((p = row.indexOf(st.drawer)) >= 0) {
+      if (dx) st.drawer = row[Math.max(0, Math.min(row.length - 1, p + dx))];
+      else if (dy < 0 && shelf.length) st.zone = Z.SHELF;
+    } else st.drawer = row[0];
     updateFocus();
   }
 
@@ -1765,6 +1779,7 @@
   function launcher(id, name, params) {
     return function () {
       lookingUp = '';
+      if (ED) noteUse(id);   // Local addition: the menu puts the last app first
       TV.launch(id, params || null, function (ok) {
         if (!ok) toast(trf("Couldn't open {app}.", {app: I18N.name(name || id)}));
       });
@@ -2351,7 +2366,7 @@
   setInterval(function () {
     if (ED && menuOn && !sheetOpen() && !(window.Custom && Custom.busy()) && Date.now() - idleAt > 30000) restMenu();
   }, 2000);
-  if (ED) setClass(document.documentElement, 'ed', true);
+  if (ED) { setClass(document.documentElement, 'ed', true); setClass(document.documentElement, 'glass', true); }   // Local addition: Cinema glass (Nov 2026)
 
   // For the browser preview and tests.
   window.FreeMyTV = {state: st, move: move, activate: activate, back: back, showSaver: showSaver, hideSaver: hideSaver, toast: toast,

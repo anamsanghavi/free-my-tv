@@ -800,3 +800,95 @@ body.menu-on #rest::before { opacity: 0 !important; }
 .night #menu .mfly .fi.focus { color: #8FD3CC; }
 .lite #menu .mfly { box-shadow: none; border: 1px solid rgba(43, 33, 26, 0.18); }
 #menu .mmodes .md { border-bottom: 0; }
+
+/* =====================================================================================================================
+ * Cinema glass (Nov 24 2026): dark, full-bleed, frosted panels. Inter, with Mukta for Devanagari. Stage 1: the resting
+ * home screen and the menu (a glass dock: recent apps as cards, mode pills, tools; Inputs folds its list up).
+ * No backdrop-filter, grid or CSS variables: old TVs. Text never under 20px.
+ * ===================================================================================================================== */
+@font-face { font-family: 'Mukta'; src: url('fonts/Mukta-300.woff2') format('woff2'); font-weight: 300; unicode-range: U+0900-097F, U+1CD0-1CFF, U+200C-200D, U+20B9, U+A830-A839, U+A8E0-A8FF; }
+@font-face { font-family: 'Mukta'; src: url('fonts/Mukta-500.woff2') format('woff2'); font-weight: 400 500; unicode-range: U+0900-097F, U+1CD0-1CFF, U+200C-200D, U+20B9, U+A830-A839, U+A8E0-A8FF; }
+@font-face { font-family: 'Mukta'; src: url('fonts/Mukta-700.woff2') format('woff2'); font-weight: 600 700; unicode-range: U+0900-097F, U+1CD0-1CFF, U+200C-200D, U+20B9, U+A830-A839, U+A8E0-A8FF; }
+html.glass #rest, html.glass #menu, html.glass #alertbar { font-family: 'Inter', 'Mukta', 'LG Smart UI', Helvetica, Arial, sans-serif; -webkit-font-feature-settings: 'tnum'; font-feature-settings: 'tnum'; }
+
+/* the picture's shade: dark at the bottom, where the words are, whatever the scene */
+html.glass #stage.dio #wallshade, html.glass #stage.dio.dio-light #wallshade, html.glass .night #stage.dio.dio-dim #wallshade {
+  opacity: 1; background: linear-gradient(0deg, rgba(5, 7, 12, 0.78) 0%, rgba(5, 7, 12, 0.2) 45%, rgba(5, 7, 12, 0) 70%) !important; }
+
+/* ---- home, resting: date and a big clock bottom left, the weather and any notice as pills bottom right ---- */
+html.glass #rest, html.glass #stage.dio-light #rest { text-align: left; color: #F5F5F7; text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35); }
+html.glass #rest .date, html.glass #stage.dio-light #rest .date { left: 96px; right: auto; top: auto; bottom: 330px; font-size: 26px; font-weight: 500;
+  letter-spacing: 0.16em; color: rgba(245, 245, 247, 0.75); }
+html.glass #rest .date .dwx { display: none; }
+html.glass #rest .time { left: 92px; right: auto; top: auto; bottom: 92px; font-size: 220px; font-weight: 200; letter-spacing: -0.04em; }
+html.glass #rest .wx, html.glass #stage.dio-light #rest .wx { left: auto; right: 96px; top: auto; bottom: 120px; padding: 14px 26px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); font-size: 26px; font-style: normal; color: #F5F5F7; text-shadow: none; }
+html.glass #rest .wx:empty { display: none; }
+html.glass #alertbar, html.glass #stage.dio-light #alertbar { left: auto !important; right: 96px; top: auto !important; bottom: 196px; padding: 14px 26px !important;
+  border-radius: 999px; background: rgba(159, 227, 220, 0.16) !important; border: 1px solid rgba(159, 227, 220, 0.45); text-align: left;
+  font-size: 24px !important; font-weight: 400 !important; color: #DDF5F2 !important; text-shadow: none; }
+html.glass #alertbar .k { font-size: 20px; letter-spacing: 0.12em; }
+html.glass #alertbar .l { display: inline; margin: 0 0 0 12px; }
+html.glass #alertbar:not(.sky) { background: rgba(242, 196, 107, 0.18) !important; border-color: rgba(242, 196, 107, 0.55); color: #FBE6B8 !important; }
+
+/* ---- the menu: the clock top left, everything else in one glass dock along the bottom ---- */
+html.glass #menu .fade, html.glass .night #menu .fade { background: linear-gradient(0deg, rgba(5, 7, 12, 0.9) 0%, rgba(5, 7, 12, 0.35) 55%, rgba(5, 7, 12, 0.1) 100%); }
+html.glass #menu .col, html.glass .night #menu .col { left: 0; top: 0; width: 1920px; height: 1080px; padding: 0; background: none; color: #F5F5F7; }
+html.glass #menu .mclock { position: absolute; left: 96px; top: 72px; white-space: nowrap; }
+html.glass #menu .mclock .t { display: inline-block; font-size: 96px; font-weight: 200; letter-spacing: -0.03em; line-height: 1; }
+html.glass #menu .mclock .s, html.glass .night #menu .mclock .s { display: inline-block; margin: 0 0 0 24px; font-size: 26px; font-style: normal; color: rgba(245, 245, 247, 0.75); }
+html.glass #menu .dock { position: absolute; left: 64px; right: 64px; bottom: 56px; box-sizing: border-box; padding: 32px 40px 32px; border-radius: 34px;
+  background: rgba(22, 26, 36, 0.68); border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); }
+html.glass #menu .dl { font-size: 20px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245, 245, 247, 0.62); }
+html.glass #menu .mapps { position: relative; margin-top: 18px; height: 176px; white-space: nowrap; font-size: 0; }
+html.glass #menu .mapps .mi, html.glass .night #menu .mapps .mi { display: inline-block; position: relative; box-sizing: border-box; width: 266px; height: 158px;
+  margin: 10px 22px 0 0; padding: 0; vertical-align: top; border: 0; border-radius: 18px; overflow: hidden; background: #3A3F4B;
+  color: #FFFFFF !important; font-size: 28px; font-weight: 600; -webkit-transition: -webkit-transform 0.15s ease; transition: transform 0.15s ease; }
+html.glass #menu .mapps .mi .n { position: absolute; left: 20px; right: 20px; bottom: 16px; overflow: hidden; text-overflow: ellipsis; }
+html.glass #menu .mapps .mi .go { display: none; }
+html.glass #menu .mapps .mi.focus { outline: 4px solid #FFFFFF; outline-offset: 4px; -webkit-transform: scale(1.04); transform: scale(1.04); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45); }
+html.glass #menu .mapps .mi.b-netflix { background: #E50914; }
+html.glass #menu .mapps .mi.b-apple { background: linear-gradient(160deg, #3A3A3C, #1D1D1F); }
+html.glass #menu .mapps .mi.b-spotify { background: #168D40; }
+html.glass #menu .mapps .mi.b-disney { background: linear-gradient(160deg, #1B4BE0, #0B1F7A); }
+html.glass #menu .mapps .mi.b-prime { background: #00739F; }
+html.glass #menu .mapps .mi.b-youtube { background: #E00000; }
+html.glass #menu .mapps.more-up::before, html.glass #menu .mapps.more-down::after { top: 62px; bottom: auto; font-size: 44px; color: rgba(245, 245, 247, 0.6); }
+html.glass #menu .mapps.more-up::before { content: '\2039'; left: -28px; right: auto; }
+html.glass #menu .mapps.more-down::after { content: '\203A'; right: -28px; }
+html.glass #menu .mrow { margin-top: 26px; display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-pack: justify; -webkit-justify-content: space-between;
+  justify-content: space-between; -webkit-box-align: end; -webkit-align-items: flex-end; align-items: flex-end; }
+html.glass #menu .mmodes, html.glass .night #menu .mmodes { margin-top: 14px; font-size: 0; white-space: nowrap; color: #F5F5F7; }
+html.glass #menu .mmodes .md { display: inline-block; width: auto; margin: 0 12px 0 0; padding: 12px 24px; border-radius: 999px; overflow: visible;
+  background: rgba(255, 255, 255, 0.10); border: 1px solid rgba(255, 255, 255, 0.16); font-size: 24px; line-height: 1.2; font-style: normal; color: #F5F5F7; }
+html.glass #menu .mmodes .md.on { background: rgba(159, 227, 220, 0.18); border-color: rgba(159, 227, 220, 0.5); color: #9FE3DC; }
+html.glass #menu .mmodes .md.focus, html.glass .night #menu .mmodes .md.focus { background: #F5F5F7; border-color: #F5F5F7; color: #0B0D12; font-weight: 600; }
+html.glass #menu .mtools, html.glass .night #menu .mtools { position: relative; margin: 0; padding: 0; border: 0; }
+html.glass #menu .mt, html.glass .night #menu .mt { min-width: 84px; margin-left: 26px; padding: 0; border: 0; font-size: 20px; color: rgba(245, 245, 247, 0.75); }
+html.glass #menu .mt .ic { box-sizing: border-box; width: 64px; height: 64px; margin: 0 auto 8px; padding: 14px; border-radius: 32px; line-height: 0;
+  background: rgba(255, 255, 255, 0.10); border: 1px solid rgba(255, 255, 255, 0.16); color: #F5F5F7; }
+html.glass #menu .mt .ic svg { width: 34px; height: 34px; }
+html.glass #menu .mt.focus, html.glass #menu .mt.open, html.glass .night #menu .mt.focus, html.glass .night #menu .mt.open { color: #F5F5F7; font-weight: 600; }
+html.glass #menu .mt.focus .ic, html.glass #menu .mt.open .ic { background: #F5F5F7; border-color: #F5F5F7; color: #0B0D12; }
+html.glass #menu .mfly, html.glass .night #menu .mfly { left: 0; top: auto; bottom: 112px; width: 420px; padding: 22px 14px 14px; border-radius: 26px;
+  background: rgba(28, 33, 45, 0.95); border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55); color: #F5F5F7;
+  -webkit-transform: translateY(12px); transform: translateY(12px); }
+html.glass #menu .mfly.on { -webkit-transform: none; transform: none; }
+html.glass #menu .mfly .ft, html.glass .night #menu .mfly .ft { padding: 0 16px 8px; margin: 0; font-size: 20px; color: rgba(245, 245, 247, 0.62); }
+html.glass #menu .mfly .fi, html.glass .night #menu .mfly .fi { padding: 14px 16px; border: 0; border-radius: 16px; font-size: 28px; font-weight: 400; }
+html.glass #menu .mfly .fi.off { opacity: 1; color: rgba(245, 245, 247, 0.5); }
+html.glass #menu .mfly .fi.focus, html.glass .night #menu .mfly .fi.focus { background: #F5F5F7; color: #0B0D12; font-weight: 600; }
+html.glass.lite #menu .dock, html.glass.lite #menu .mfly { box-shadow: none; }
+html.glass.lite #menu .mapps .mi.focus { box-shadow: none; }
+/* bright scenes: a deeper shade under the clock, and a little more weight */
+html.glass #stage.dio #wallshade, html.glass #stage.dio.dio-light #wallshade, html.glass .night #stage.dio.dio-dim #wallshade {
+  background: linear-gradient(20deg, rgba(5, 7, 12, 0.82) 0%, rgba(5, 7, 12, 0.45) 32%, rgba(5, 7, 12, 0) 62%) !important; }
+html.glass #rest .time { font-weight: 300; text-shadow: 0 4px 40px rgba(0, 0, 0, 0.55); }
+/* the clock always takes light ink here (the measured inks were for the old top-centre clock), over its own dark glow */
+html.glass #rest::before, html.glass #stage.ink-clock-d #rest::before { left: -260px; top: auto; bottom: -300px; width: 1700px; height: 900px; margin: 0; opacity: 1;
+  background: radial-gradient(ellipse at 35% 60%, rgba(5, 7, 12, 0.78) 0%, rgba(5, 7, 12, 0.5) 38%, rgba(5, 7, 12, 0) 70%); }
+html.glass #stage #rest .date, html.glass #stage #rest .time, html.glass #stage.ink-date-d #rest .date, html.glass #stage.ink-clock-d #rest .time { color: #F5F5F7; }
+html.glass #stage.ink-date-d #rest .date { color: rgba(245, 245, 247, 0.8); text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5); }
+html.glass #stage.ink-clock-d #rest .time, html.glass #stage #rest .time { text-shadow: 0 4px 40px rgba(0, 0, 0, 0.55); }
+html.glass #stage #alertbar, html.glass #stage.ink-notice-d #alertbar { text-shadow: none; }
+html.glass #stage.ink-notice-d #alertbar .k, html.glass #stage:not(.ink-notice-d) #alertbar .k { color: inherit; }
