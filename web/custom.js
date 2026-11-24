@@ -39,6 +39,16 @@ var Custom = (function () {
   // daytime there (RJs on air) or the small hours (mostly music): in = India, pt = US Pacific, et = Toronto, mt = Calgary.
   var AIR = 'https://airhlspush.pc.cdn.bitgravity.com/httppush/';
   var LIVE_RJS = [
+    // the big private FM stations, through relays others run (listed on onlineradiofm.in, plain streams, no login): not the
+    // stations' own, so any of them can go quiet; the stations put no public live stream online themselves
+    {name: 'Radio Mirchi 98.3', by: 'relay', tz: 'in', url: 'https://stream.zeno.fm/wgaznsmt92quv'},
+    {name: 'Red FM 93.5', by: 'relay', tz: 'in', url: 'https://stream.zeno.fm/9phrkb1e3v8uv'},
+    {name: 'Big FM 92.7', by: 'relay', tz: 'in', url: 'https://stream.zeno.fm/dbstwo3dvhhtv'},
+    {name: 'Radio City 91.1', by: 'relay', tz: 'in', url: 'https://radios.crabdance.com:8002/5'},
+    {name: 'Club FM 94.3', by: 'Malayalam · relay', tz: 'in', url: 'https://strw3.openstream.co/1452'},
+    {name: 'Radio Mirchi Tamil', by: 'relay', tz: 'in', url: 'https://radios.crabdance.com:8002/1'},
+    {name: 'Suryan FM 93.5', by: 'Tamil · relay', tz: 'in', url: 'https://radios.crabdance.com:8002/2'},
+    {name: 'Radio Hungama · 90s Once Again', by: 'music, relay', tz: '', url: 'https://stream.zeno.fm/rm4i9pdex3cuv'},
     {name: 'Vividh Bharati', by: 'All India Radio', tz: 'in', url: 'https://air.pc.cdn.bitgravity.com/air/live/pbaudio001/playlist.m3u8'},
     {name: 'FM Gold Delhi', by: 'All India Radio', tz: 'in', url: AIR + 'hlspbaudio005/hlspbaudio00564kbps.m3u8'},
     {name: 'FM Rainbow Delhi', by: 'All India Radio', tz: 'in', url: AIR + 'hlspbaudio004/hlspbaudio00432kbps.m3u8'},
