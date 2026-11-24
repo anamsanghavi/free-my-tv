@@ -462,6 +462,14 @@
   // Local addition: the editorial layout. The home screen rests on the diorama with a big clock; any key opens the menu,
   // a column on the left: the clock, the apps as a list, then the modes and shortcuts. Back, or a quiet minute, rests again.
   var ED = !!window.Custom, menuOn = false, menuFirst = 0, MENU_ROWS = 6;
+  var menuModes = [], menuTools = [], menuFly = false, MENU_INPUTS = -1;   // the menu's grid and tools, as drawerItems indexes
+  var MENU_SVG = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">';
+  var MENU_ICONS = {
+    inputs: MENU_SVG + '<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+    wifi: MENU_SVG + '<path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/></svg>',
+    apps: MENU_SVG + '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+    settings: MENU_SVG + '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>'
+  };
   var cards = [];
 
   /** Local addition: the picks only when Custom leaves them on. */
@@ -702,22 +710,55 @@
       el('div', 's', mc);
       el('div', 'mapps', col);
       el('div', 'mmodes', col);
+      el('div', 'mtools', col);
+      el('div', 'mfly', m);
       stage.insertBefore(m, $('drawer'));
     }
-    var apps = m.querySelector('.mapps'), modes = m.querySelector('.mmodes'), i;
+    var apps = m.querySelector('.mapps'), modes = m.querySelector('.mmodes'), tools = m.querySelector('.mtools'), fly = m.querySelector('.mfly'), i;
     apps.innerHTML = '';
     for (i = 0; i < shelf.length; i++) {
-      var row = el('div', 'mi', apps);
-      el('span', 'n', row, I18N.name(shelf[i].title));
+      var row = el('div', 'mi' + brandClass(shelf[i]), apps);
+      el('span', 'n', row, shortName(I18N.name(shelf[i].title)));
       el('span', 'go', row, 'open \u2192');
       hover(row, Z.SHELF, i);
     }
+    // The modes as a grid of three; the inputs fold into one tool, beside Wi-Fi, All Apps and Settings (TV Settings is in Settings)
+    menuModes = [];
+    menuTools = [];
+    var wifi = -1, all = -1, set = -1;
+    for (i = drawerInputs; i < drawerItems.length; i++) {
+      var sy = drawerItems[i].symbol;
+      if (sy === 'wifi') wifi = i;
+      else if (sy === 'apps') all = i;
+      else if (sy === 'settings') set = i;
+      else if (sy !== 'tv_settings') menuModes.push(i);
+    }
+    if (drawerInputs) menuTools.push(MENU_INPUTS);
+    if (wifi >= 0) menuTools.push(wifi);
+    if (all >= 0) menuTools.push(all);
+    if (set >= 0) menuTools.push(set);
     modes.innerHTML = '';
-    for (i = 0; i < drawerItems.length; i++) {
-      var item = drawerItems[i];
-      if (i) el('span', 'sep', modes, ' \u00B7 ');
-      var md = el('span', 'md' + (item.on ? ' on' : '') + (item.off ? ' off' : ''), modes, I18N.name(item.label));
-      hover(md, Z.DRAWER, i);
+    for (i = 0; i < menuModes.length; i++) {
+      var item = drawerItems[menuModes[i]];
+      var md = el('div', 'md' + (item.on ? ' on' : '') + (item.off ? ' off' : ''), modes, I18N.name(item.label));
+      md.setAttribute('data-i', menuModes[i]);
+      hover(md, Z.DRAWER, menuModes[i]);
+    }
+    tools.innerHTML = '';
+    for (i = 0; i < menuTools.length; i++) {
+      var ix = menuTools[i], t = el('div', 'mt', tools);
+      var ic = el('span', 'ic', t);
+      ic.innerHTML = MENU_ICONS[ix === MENU_INPUTS ? 'inputs' : drawerItems[ix].symbol] || '';
+      el('span', 'l', t, ix === MENU_INPUTS ? tr('Inputs') : I18N.name(drawerItems[ix].label));
+      t.setAttribute('data-i', ix);
+      hover(t, Z.DRAWER, ix);
+    }
+    fly.innerHTML = '';
+    el('div', 'ft', fly, tr('Inputs'));
+    for (i = 0; i < drawerInputs; i++) {
+      var fi = el('div', 'fi' + (drawerItems[i].off ? ' off' : ''), fly, I18N.name(drawerItems[i].label));
+      fi.setAttribute('data-i', i);
+      hover(fi, Z.DRAWER, i);
     }
     renderMenuClock();
     menuFocus();
@@ -736,12 +777,43 @@
     var apps = $('menu').querySelector('.mapps');
     setClass(apps, 'more-up', menuFirst > 0);
     setClass(apps, 'more-down', menuFirst + MENU_ROWS < rows.length);
-    for (i = 0; i < mds.length; i++) setClass(mds[i], 'focus', menuOn && st.zone === Z.DRAWER && st.drawer === i);
+    var inDrawer = menuOn && st.zone === Z.DRAWER, marks = $('menu').querySelectorAll('.md, .mt, .fi');
+    for (i = 0; i < marks.length; i++) setClass(marks[i], 'focus', inDrawer && st.drawer === +marks[i].getAttribute('data-i') &&
+      (marks[i].className.indexOf('fi') === 0) === (menuFly && st.drawer >= 0 && st.drawer < drawerInputs));
+    var inputsTool = $('menu').querySelector('.mt[data-i="' + MENU_INPUTS + '"]');
+    if (inputsTool) setClass(inputsTool, 'open', menuFly);
+    setClass($('menu').querySelector('.mfly'), 'on', menuOn && menuFly);
+  }
+
+  /** The brand's colour for the big streaming apps' names in the menu (custom.css has each, by day and by night). */
+  function brandClass(app) {
+    var s = ((app.id || '') + ' ' + (app.title || '')).toLowerCase();
+    var b = s.indexOf('netflix') >= 0 ? 'netflix' : s.indexOf('spotify') >= 0 ? 'spotify' : s.indexOf('disney') >= 0 ? 'disney' :
+      s.indexOf('youtube') >= 0 ? 'youtube' : s.indexOf('prime') >= 0 || s.indexOf('amazon') >= 0 ? 'prime' :
+      s.indexOf('apple') >= 0 ? 'apple' : '';
+    return b ? ' b-' + b : '';
+  }
+
+  /** "Spotify - Music and Podcasts" is Spotify: a store name's tagline goes. */
+  function shortName(name) { return String(name).split(/\s[-\u2013\u2014:|]\s/)[0]; }
+
+  function openFly() {
+    menuFly = true;
+    st.drawer = 0;
+    updateFocus();
+  }
+
+  function closeFly() {
+    menuFly = false;
+    st.zone = Z.DRAWER;
+    st.drawer = MENU_INPUTS;
+    updateFocus();
   }
 
   function wakeMenu() {
     menuOn = true;
     menuFirst = 0;
+    menuFly = false;
     if (shelf.length) { st.zone = Z.SHELF; st.shelf = 0; }
     else { st.zone = Z.DRAWER; st.drawer = 0; }
     setClass(body, 'menu-on', true);
@@ -752,20 +824,40 @@
   function restMenu() {
     if (!menuOn) return;
     menuOn = false;
+    menuFly = false;
     st.zone = Z.SHELF;
     setClass(body, 'menu-on', false);
     updateFocus();
   }
 
-  /** In the menu: ↑ ↓ through the apps, on down into the modes line, where ← → move along it and ↑ goes back up. */
+  /**
+   * In the menu: ↑ ↓ through the apps, on down into the modes (a grid of three across), then the tools' row (Inputs,
+   * Wi-Fi, All Apps, Settings). OK on Inputs folds its list out beside the column: ↑ ↓ there, ← or Back folds it away.
+   */
   function menuMove(dx, dy) {
+    var COLS = 3, p, t, n = menuModes.length;
     if (st.zone === Z.SHELF) {
-      if (dy > 0 && st.shelf >= shelf.length - 1) { if (drawerItems.length) st.zone = Z.DRAWER; }
+      if (dy > 0 && st.shelf >= shelf.length - 1) { st.zone = Z.DRAWER; st.drawer = n ? menuModes[0] : menuTools[0]; }
       else if (dy) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dy));
-    } else {
-      if (dx) st.drawer = Math.max(0, Math.min(drawerItems.length - 1, st.drawer + dx));
-      else if (dy < 0 && shelf.length) { st.zone = Z.SHELF; st.shelf = shelf.length - 1; }
-    }
+    } else if (menuFly) {
+      if (dy) st.drawer = Math.max(0, Math.min(drawerInputs - 1, st.drawer + dy));
+      else if (dx < 0) { closeFly(); return; }
+    } else if ((p = menuModes.indexOf(st.drawer)) >= 0) {
+      if (dx) { var q = p + dx; if (q >= 0 && q < n && Math.floor(q / COLS) === Math.floor(p / COLS)) st.drawer = menuModes[q]; }
+      else if (dy < 0) { if (p >= COLS) st.drawer = menuModes[p - COLS]; else if (shelf.length) { st.zone = Z.SHELF; st.shelf = shelf.length - 1; } }
+      else if (dy > 0) {
+        if (p + COLS < n) st.drawer = menuModes[p + COLS];
+        else if (menuTools.length) st.drawer = menuTools[Math.min(menuTools.length - 1, Math.round((p % COLS) * (menuTools.length - 1) / (COLS - 1)))];
+      }
+    } else if ((t = menuTools.indexOf(st.drawer)) >= 0) {
+      if (dx) st.drawer = menuTools[Math.max(0, Math.min(menuTools.length - 1, t + dx))];
+      else if (dy < 0) {
+        if (n) {
+          var last = Math.floor((n - 1) / COLS) * COLS, col = Math.round(t * (COLS - 1) / Math.max(1, menuTools.length - 1));
+          st.drawer = menuModes[Math.min(n - 1, last + col)];
+        } else if (shelf.length) { st.zone = Z.SHELF; st.shelf = shelf.length - 1; }
+      }
+    } else st.drawer = n ? menuModes[0] : menuTools[0];
     updateFocus();
   }
 
@@ -1135,7 +1227,7 @@
     }
     rows.push({label: tr('Shelf'), value: '›', shelf: true, step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('About this TV'), value: '›', about: true, step: function (d) { if (d >= 0) openAbout(); }});
-    if (TV.canOpenSettings) rows.push({label: tr('TV Settings'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
+    if (TV.canOpenSettings) rows[ED ? 'unshift' : 'push']({label: tr('TV Settings'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});   // Local addition: first, since the menu no longer has it
     return rows;
   }
 
@@ -1747,6 +1839,8 @@
         if (shelf[st.shelf]) launcher(shelf[st.shelf].id, shelf[st.shelf].title)();
         return;
       case Z.DRAWER:
+        if (ED && menuOn && st.drawer === MENU_INPUTS) { openFly(); return; }   // Local addition: the inputs fold out
+        if (ED && menuOn && menuFly) menuFly = false;
         if (drawerItems[st.drawer]) drawerItems[st.drawer].run();
         return;
       case Z.APPS:
@@ -1864,6 +1958,7 @@
     if (st.zone === Z.KEY) { if (keyAsking) askRemoveKey(false); else closeKey(); return; }
     if (st.zone === Z.ABOUT) { closeAbout(); return; }
     if (sheetOpen()) { closeSheets(); return; }
+    if (ED && menuOn && menuFly) { closeFly(); return; }   // Local addition: Back folds the inputs away first
     if (ED && menuOn) { restMenu(); return; }   // Local addition: the menu goes, the diorama and its clock stay
     if (st.zone === Z.DRAWER) { closeDrawer(); return; }
     if (st.zone !== Z.SHELF && shelf.length) { st.zone = Z.SHELF; updateFocus(); return; }
@@ -1882,7 +1977,7 @@
       if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
       else if (zone === Z.CARDS) st.card = index;
       else if (zone === Z.SHELF) st.shelf = index;
-      else if (zone === Z.DRAWER) st.drawer = index;
+      else if (zone === Z.DRAWER) { st.drawer = index; if (ED && menuFly && node.className.indexOf('fi') !== 0) menuFly = false; }   // Local addition: off the inputs' list folds it away
       else if (zone === Z.APPS) st.grid = index;
       else if (zone === Z.SETTINGS) st.row = index;
       else if (zone === Z.EDIT) st.edit = index;

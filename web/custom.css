@@ -743,3 +743,60 @@ body.menu-on #rest::before { opacity: 0 !important; }
 #saver .clock .title.skycap .l { font-size: 28px; line-height: 1.4; color: rgba(255, 248, 238, 0.92); }
 #saver .skybox canvas.sky-ground { z-index: 3; }
 #saver .skybox { z-index: 0; }
+
+/* ---- The menu, Nov 24 2026: the apps in their brands' colours, the modes as a grid of three, and a row of four tools
+   (Inputs, Wi-Fi, All Apps, Settings) whose Inputs folds its list out beside the column. No CSS grid: old TVs. ---- */
+#menu .col { padding: 72px 72px; }
+#menu .mclock .t { font-size: 160px; }
+#menu .mclock .s { font-size: 30px; }
+#menu .mapps { margin-top: 30px; }
+#menu .mi { padding: 9px 0; font-size: 42px; font-weight: 400; }
+#menu .mi.focus { font-weight: 600; }
+#menu .mi .go { font-size: 26px; }
+/* brand colours: by day a shade deep enough for the paper, by night one light enough for the ink (3:1 or more, large text) */
+#menu .mi.b-netflix, #menu .mi.b-netflix.focus { color: #E50914; }
+#menu .mi.b-apple, #menu .mi.b-apple.focus { color: #1D1D1F; }
+#menu .mi.b-spotify, #menu .mi.b-spotify.focus { color: #168D40; }
+#menu .mi.b-disney, #menu .mi.b-disney.focus { color: #113CCF; }
+#menu .mi.b-prime, #menu .mi.b-prime.focus { color: #00739F; }
+#menu .mi.b-youtube, #menu .mi.b-youtube.focus { color: #E00000; }
+.night #menu .mi.b-apple, .night #menu .mi.b-apple.focus { color: #F5F5F7; }
+.night #menu .mi.b-spotify, .night #menu .mi.b-spotify.focus { color: #1ED760; }
+.night #menu .mi.b-disney, .night #menu .mi.b-disney.focus { color: #5B8CFF; }
+.night #menu .mi.b-prime, .night #menu .mi.b-prime.focus { color: #1AB2E8; }
+.night #menu .mi.b-youtube, .night #menu .mi.b-youtube.focus { color: #FF3B3B; }
+
+#menu .mmodes { margin-top: 30px; font-size: 0; line-height: 1; color: #2B211A; }
+.night #menu .mmodes { color: #F3EDE4; }
+#menu .mmodes .md { display: inline-block; width: 33.33%; box-sizing: border-box; padding-right: 14px; margin: 5px 0;
+  font-size: 30px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+
+#menu .mtools { margin-top: 30px; padding-top: 22px; border-top: 1px solid rgba(43, 33, 26, 0.12);
+  display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between; }
+.night #menu .mtools { border-top-color: rgba(243, 237, 228, 0.12); }
+#menu .mt { min-width: 96px; text-align: center; font-size: 20px; color: #6B5A4B; border-bottom: 3px solid transparent; padding-bottom: 4px; }
+.night #menu .mt { color: rgba(243, 237, 228, 0.7); }
+#menu .mt .ic { display: block; height: 34px; margin-bottom: 8px; }
+#menu .mt .ic svg { display: inline-block; }
+#menu .mt .l { white-space: nowrap; }
+#menu .mt.focus, #menu .mt.open { color: #1F6F6B; font-weight: 600; }
+#menu .mt.focus { border-bottom-color: #1F6F6B; }
+.night #menu .mt.focus, .night #menu .mt.open { color: #8FD3CC; }
+.night #menu .mt.focus { border-bottom-color: #8FD3CC; }
+
+#menu .mfly { position: absolute; left: 640px; bottom: 72px; width: 360px; box-sizing: border-box; padding: 18px 34px 20px;
+  background: #FBF7F1; color: #2B211A; border-radius: 22px; box-shadow: 0 18px 50px rgba(43, 33, 26, 0.22); text-align: left;
+  opacity: 0; visibility: hidden; -webkit-transform: translateX(-16px); transform: translateX(-16px);
+  -webkit-transition: opacity 0.2s ease, -webkit-transform 0.2s ease, visibility 0s 0.2s; transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s 0.2s; }
+#menu .mfly.on { opacity: 1; visibility: visible; -webkit-transform: none; transform: none; -webkit-transition-delay: 0s; transition-delay: 0s; }
+.night #menu .mfly { background: #241E18; color: #F3EDE4; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5); }
+#menu .mfly .ft { margin: 6px 0 4px; font-size: 17px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: #6B5A4B; }
+.night #menu .mfly .ft { color: rgba(243, 237, 228, 0.66); }
+#menu .mfly .fi { padding: 11px 0; font-size: 34px; font-weight: 300; border-bottom: 1px solid rgba(43, 33, 26, 0.12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#menu .mfly .fi:last-child { border-bottom: 0; }
+.night #menu .mfly .fi { border-bottom-color: rgba(243, 237, 228, 0.12); }
+#menu .mfly .fi.off { opacity: 0.5; }
+#menu .mfly .fi.focus { color: #1F6F6B; font-weight: 600; opacity: 1; }
+.night #menu .mfly .fi.focus { color: #8FD3CC; }
+.lite #menu .mfly { box-shadow: none; border: 1px solid rgba(43, 33, 26, 0.18); }
+#menu .mmodes .md { border-bottom: 0; }
