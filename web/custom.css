@@ -1042,3 +1042,47 @@ html.glass #overlay.guest .g-row, html.glass .night #overlay.guest .g-row { padd
 html.glass #overlay.guest .g-row .g-name { font-size: 22px; opacity: 0.7; }
 html.glass #overlay.guest .g-row input { font-size: 30px; color: #F5F5F7; }
 html.glass #overlay.guest .g-row.focus, html.glass .night #overlay.guest .g-row.focus { border-color: #F5F5F7; background: rgba(255, 255, 255, 0.14); }
+
+/* ---- Cinema glass, stage 4: Settings (categories, then the open one), its lists, and All Apps ---- */
+html.glass .sheet, html.glass .night .sheet { background: linear-gradient(90deg, rgba(5, 7, 12, 0.88) 0%, rgba(5, 7, 12, 0.7) 50%, rgba(5, 7, 12, 0.35) 100%);
+  color: #F5F5F7; font-family: 'Inter', 'Mukta', Helvetica, Arial, sans-serif; }
+html.glass #settings .box, html.glass #shelfedit .box, html.glass #langpick .box, html.glass #citypick .box, html.glass #keypick .box, html.glass #about .box,
+html.glass .night #settings .box, html.glass .night #shelfedit .box, html.glass .night #langpick .box, html.glass .night #citypick .box, html.glass .night #keypick .box, html.glass .night #about .box {
+  left: 64px; top: 64px; width: 900px; height: 952px; box-sizing: border-box; padding: 44px 40px; border-radius: 30px;
+  background: rgba(22, 26, 36, 0.78); border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); color: #F5F5F7; }
+html.glass .box .title { padding: 0 20px 30px; font-size: 56px; font-weight: 300; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.glass .box .row, html.glass .night .box .row { height: 70px; line-height: 70px; margin-bottom: 8px; padding: 0 24px; border: 0; border-radius: 16px;
+  font-size: 28px; font-weight: 400; color: #F5F5F7; }
+html.glass .box .row.focus, html.glass .night .box .row.focus { background: #F5F5F7 !important; color: #0B0D12; font-weight: 600; }
+html.glass .box .row .value, html.glass .night .box .row .value { right: 24px; font-size: 24px; font-style: normal; color: rgba(245, 245, 247, 0.65); }
+html.glass .box .row.focus .value, html.glass .night .box .row.focus .value { color: #3A3F4B; }
+html.glass .box .row.catrow { line-height: 38px; padding-top: 4px; }
+html.glass .box .row .sub { font-size: 20px; line-height: 24px; color: rgba(245, 245, 247, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 60px; font-weight: 400; }
+html.glass .box .row.focus .sub { color: #3A3F4B; }
+html.glass .box .row.dim { opacity: 0.45; }
+html.glass .box .hint, html.glass .night .box .hint { position: absolute; left: 64px; bottom: 36px; padding: 0; font-size: 22px; color: rgba(245, 245, 247, 0.55); }
+html.glass .box .row .toggle { background: rgba(255, 255, 255, 0.2); }
+html.glass .box .row .toggle.on { background: #9FE3DC; }
+
+html.glass #apps, html.glass .night #apps { background: rgba(8, 10, 16, 0.84); color: #F5F5F7; font-family: 'Inter', Helvetica, Arial, sans-serif; }
+html.glass #apps h2 { left: 138px; top: 96px; font-size: 72px; font-weight: 300; letter-spacing: -0.02em; }
+html.glass #apps .cell { width: 300px; height: 168px; border-radius: 18px; overflow: hidden; background: #2A2F3B; }
+html.glass #apps .cell .label, html.glass .night #apps .cell .label { top: auto; bottom: 16px; left: 20px; right: 20px; padding: 0; border: 0; font-size: 26px; font-weight: 600;
+  color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+html.glass #apps .cell.focus { outline: 4px solid #FFFFFF; outline-offset: 4px; }
+html.glass #apps .cell.focus .label, html.glass .night #apps .cell.focus .label { color: #FFFFFF; }
+html.glass #apps .cell.b-netflix { background: #E50914; }
+html.glass #apps .cell.b-apple { background: linear-gradient(160deg, #3A3A3C, #1D1D1F); }
+html.glass #apps .cell.b-spotify { background: #168D40; }
+html.glass #apps .cell.b-disney { background: linear-gradient(160deg, #1B4BE0, #0B1F7A); }
+html.glass #apps .cell.b-prime { background: #00739F; }
+html.glass #apps .cell.b-youtube { background: #E00000; }
+html.glass #apps .foot, html.glass .night #apps .foot { bottom: 56px; font-size: 22px; color: rgba(245, 245, 247, 0.55); }
+/* the screensaver's card: Inter, the glass tint, the film in teal */
+html.glass #saver .clock, html.glass #ambient .clock { font-family: 'Inter', 'Mukta', Helvetica, Arial, sans-serif; -webkit-font-feature-settings: 'tnum'; font-feature-settings: 'tnum'; }
+html.glass #saver .clock { background: rgba(22, 26, 36, 0.58) !important; border: 1px solid rgba(255, 255, 255, 0.16); }
+html.glass #saver .clock .time { font-weight: 200 !important; letter-spacing: -0.04em; }
+html.glass #saver .clock .date { font-style: normal !important; color: rgba(245, 245, 247, 0.7) !important; }
+html.glass #saver .clock .title.quote { font-weight: 300; color: #F5F5F7; }
+html.glass #saver .clock .title.quote span { color: #9FE3DC; font-size: 18px !important; }
+html.glass #saver .clock .hint { font-size: 20px; }

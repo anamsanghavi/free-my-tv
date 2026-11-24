@@ -462,6 +462,7 @@
   // Local addition: the editorial layout. The home screen rests on the diorama with a big clock; any key opens the menu,
   // a column on the left: the clock, the apps as a list, then the modes and shortcuts. Back, or a quiet minute, rests again.
   var ED = !!window.Custom, menuOn = false, menuFirst = 0, MENU_ROWS = 6;
+  var APPS_STEP = 216;   // All Apps, Cinema glass: one row of cards and its gap
   var menuModes = [], menuTools = [], menuFly = false, MENU_INPUTS = -1;   // the menu's grid and tools, as drawerItems indexes
   var MENU_SVG = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">';
   var MENU_ICONS = {
@@ -497,9 +498,9 @@
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.DRAWER && st.drawer === i);
     list = document.querySelectorAll('#apps .cell');
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.APPS && st.grid === i);
-    var rows = Math.max(1, Math.ceil(others.length / 5)), r = Math.floor(st.grid / 5), shownRows = ED ? 6 : 3;
-    var first = Math.max(0, Math.min(rows - shownRows, r - (ED ? 2 : 1)));
-    $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * (ED ? 92 : 239)) + 'px)';
+    var rows = Math.max(1, Math.ceil(others.length / 5)), r = Math.floor(st.grid / 5), shownRows = ED ? 3 : 3;
+    var first = Math.max(0, Math.min(rows - shownRows, r - 1));
+    $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * (ED ? APPS_STEP : 239)) + 'px)';
     if (ED) for (i = 0; i < list.length; i++) list[i].style.visibility = Math.floor(i / 5) >= first && Math.floor(i / 5) < first + shownRows ? '' : 'hidden';
     focusRows($('settings'), st.row, st.zone === Z.SETTINGS);
     focusRows($('shelfedit'), st.edit, st.zone === Z.EDIT);
@@ -966,7 +967,7 @@
     drawerInputs = drawerItems.length;
     if (window.Custom) drawerItems = drawerItems.concat(Custom.modes());   // Local addition: the modes
     drawerItems.push({label: tr('All Apps'), symbol: 'apps', run: openApps});
-    drawerItems.push({label: window.Custom ? 'Settings' : tr('Home Settings'), symbol: 'settings', run: openSettings});   // Local addition: short enough to fit
+    drawerItems.push({label: window.Custom ? 'Settings' : tr('Home Settings'), symbol: 'settings', run: function () { settingsCat = null; openSettings(); }});   // Local addition: short enough to fit
     if (TV.canOpenSettings) drawerItems.push({label: tr('TV Settings'), symbol: 'tv_settings', run: tvSettings});
     var n = drawerItems.length, gap = 18, groupGap = 56, groups = drawerInputs > 0 && drawerInputs < n ? 2 : 1;
     var tw = Math.min(230, (1760 - Math.max(0, n - groups) * gap - (groups - 1) * groupGap) / Math.max(1, n));
@@ -1125,9 +1126,9 @@
     if (ED && !sheet.querySelector('.foot')) sheet.insertBefore(el('div', 'foot', null, 'OK opens  \u00B7  Back to the menu'), grid);   // Local addition
     grid.innerHTML = '';
     for (var i = 0; i < others.length; i++) {
-      var r = Math.floor(i / 5), c = i % 5, cell = el('div', 'cell', grid);
-      startAt(cell, ED ? 120 + c * 336 : 130 + c * 340);   // Local addition: a list of names, five across
-      cell.style.top = (ED ? 300 + r * 92 : 196 + r * 239) + 'px';
+      var r = Math.floor(i / 5), c = i % 5, cell = el('div', 'cell' + (ED ? brandClass(others[i]) : ''), grid);
+      startAt(cell, ED ? 138 + c * 336 : 130 + c * 340);   // Local addition (Cinema glass): brand-coloured cards, five across
+      cell.style.top = (ED ? 250 + r * APPS_STEP : 196 + r * 239) + 'px';
       face(others[i], el('div', 'face', cell), wordFit(others[i].title, 300, 34));
       el('div', 'label', cell, I18N.name(others[i].title));
       hover(cell, Z.APPS, i);
@@ -1252,17 +1253,60 @@
 
   var rowsNow = [];
 
+  // Local addition (Cinema glass): Settings in categories. The left rail names them; the right panel holds the one open.
+  var settingsCat = null;
+  var SETTING_CATS = ['Display', 'Home screen', 'Movies & keys', 'Screensaver', 'Language & city', 'More'];
+
+  function catOf(r) {
+    var L = r.label, is = function () { for (var i = 0; i < arguments.length; i++) if (L === tr(arguments[i]) || L === arguments[i]) return true; return false; };
+    if (r.language || r.city || is('Temperature')) return 'Language & city';
+    var sv = Data.services();
+    for (var k = 0; k < sv.length; k++) if (L === sv[k].name) return 'Movies & keys';   // Picks from: one toggle per service
+    if (r.tmdb || r.services || is('Picks from', 'Open picks in', 'Picks per tab', 'Cartoons and anime', 'Watchmode key')) return 'Movies & keys';
+    if (is('Screensaver', 'Screensaver changes every', 'Screensaver after dark', 'Watch from the screensaver', 'Ambient sound')) return 'Screensaver';
+    if (is('Theme', 'Clock', 'Dim', 'Weather effects', 'Weather widget', 'Forecast', 'Quotes widget', 'Bitcoin', 'Ethereum', 'Solana', 'Dollar')) return 'Display';
+    if (r.inputs || r.shelf || is('Live TV button', 'Home button')) return 'Home screen';
+    return 'More';
+  }
+
+  function settingsRowsNow() {
+    var all = settingRows();
+    if (!ED) return all;
+    var tvRow = null, aboutRow = null, by = {}, i;
+    for (i = 0; i < all.length; i++) {
+      if (all[i].label === tr('TV Settings')) { tvRow = all[i]; continue; }
+      if (all[i].about) { aboutRow = all[i]; continue; }
+      var c = catOf(all[i]);
+      (by[c] = by[c] || []).push(all[i]);
+    }
+    if (settingsCat && by[settingsCat]) return by[settingsCat];
+    settingsCat = null;
+    var out = [];
+    for (i = 0; i < SETTING_CATS.length; i++) {
+      if (!by[SETTING_CATS[i]]) continue;
+      (function (name, rows) {
+        out.push({label: name, value: '\u203A', cat: name, sub: rows.slice(0, 4).map(function (r) { return I18N.name(r.label); }).join(', '),
+          step: function (d) { if (d >= 0) { settingsCat = name; st.row = 0; } }});
+      })(SETTING_CATS[i], by[SETTING_CATS[i]]);
+    }
+    if (aboutRow) out.push(aboutRow);
+    if (tvRow) out.push(tvRow);
+    return out;
+  }
+
   function renderSettings() {
     var box = $('settings').firstChild;
     box.innerHTML = '';
     var title = el('div', 'title', box);
     sym('settings', title);
-    title.appendChild(document.createTextNode(tr('Home Settings')));
+    title.appendChild(document.createTextNode(ED ? (settingsCat ? 'Settings \u203A ' + settingsCat : 'Settings') : tr('Home Settings')));
     var list = el('div', 'list', box), holder = el('div', 'rows', list);
-    rowsNow = settingRows();
+    rowsNow = settingsRowsNow();
+    setClass($('settings'), 'in-cat', !!settingsCat);
     list.style.height = Math.min(rowsNow.length, 7) * 78 + 'px';
     for (var i = 0; i < rowsNow.length; i++) {
-      var r = rowsNow[i], row = el('div', 'row' + (r.dim ? ' dim' : ''), holder, I18N.name(r.label));
+      var r = rowsNow[i], row = el('div', 'row' + (r.dim ? ' dim' : '') + (r.cat ? ' catrow' : ''), holder, I18N.name(r.label));
+      if (r.sub) el('div', 'sub', row, r.sub);
       if (r.toggle !== undefined) setClass(el('div', 'toggle', row), 'on', r.toggle);
       else {
         var v = el('span', 'value', row);
@@ -1272,7 +1316,7 @@
       }
       hover(row, Z.SETTINGS, i);
     }
-    el('div', 'hint', box, tr('OK or the arrows change the value.'));
+    el('div', 'hint', box, ED && !settingsCat ? 'OK opens  \u00B7  Back closes' : ED ? '\u2190 \u2192 or OK change a value  \u00B7  Back to the categories' : tr('OK or the arrows change the value.'));
     updateFocus();
   }
 
@@ -1972,6 +2016,15 @@
     if (st.zone === Z.CITY) { closeCities(false); return; }
     if (st.zone === Z.KEY) { if (keyAsking) askRemoveKey(false); else closeKey(); return; }
     if (st.zone === Z.ABOUT) { closeAbout(); return; }
+    if (ED && st.zone === Z.SETTINGS && settingsCat) {   // Local addition: Back from a category to the categories
+      var was = settingsCat;
+      settingsCat = null;
+      rowsNow = settingsRowsNow();
+      st.row = 0;
+      for (var ci = 0; ci < rowsNow.length; ci++) if (rowsNow[ci].cat === was) st.row = ci;
+      renderSettings();
+      return;
+    }
     if (sheetOpen()) { closeSheets(); return; }
     if (ED && menuOn && menuFly) { closeFly(); return; }   // Local addition: Back folds the inputs away first
     if (ED && menuOn) { restMenu(); return; }   // Local addition: the menu goes, the diorama and its clock stay
