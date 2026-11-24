@@ -30,7 +30,7 @@ var Custom = (function () {
   // the picker's first page; Genres, Countries and Languages are read from Radio Browser, with these first in each
   var STUDY_GENRES = [
     {name: 'Visuals', visuals: true}, {name: 'MilkDrop · next look', nextLook: true}, {name: 'Saved', saved: true},
-    {name: 'Live RJs', live: true, meta: 'India, Mirchi USA, Toronto'}, {name: 'Search stations', search: true, meta: 'by name'}, {name: 'Indian FM', fm: true}, {name: 'Podcasts', pods: true, meta: 'stories, horror, RJ shows'},
+    {name: 'Live RJs', live: true, meta: 'India, Mirchi USA, Toronto'}, {name: 'All Indian stations', india: true, meta: 'by language'}, {name: 'Search stations', search: true, meta: 'by name'}, {name: 'Indian FM', fm: true}, {name: 'Podcasts', pods: true, meta: 'stories, horror, RJ shows'},
     {name: 'Genres', list: 'tags', meta: 'all of them'}, {name: 'Countries', list: 'countries'}, {name: 'Languages', list: 'languages'},
     {name: 'Most played worldwide', q: 'order=clickcount&reverse=true'}, {name: 'Noise · works offline', noise: true}
   ];
@@ -1981,8 +1981,50 @@ var Custom = (function () {
   }
   function view() { var st = study.picker.stack; return st[st.length - 1]; }
 
+  // MARK: all Indian stations: onlineradiofm.in's catalogue (web/vendor/indianstations.js, made by tools/indian_stations.py),
+  // [name, stream, language, genre] by name; most are relays others run, loaded only when asked for
+
+  var india = null;
+  function indiaLoad(done) {
+    if (india || window.INDIAN_STATIONS) { india = india || window.INDIAN_STATIONS; return done(india); }
+    var sc = document.createElement('script');
+    sc.src = 'vendor/indianstations.js';
+    sc.onload = function () { india = window.INDIAN_STATIONS || []; done(india); };
+    sc.onerror = function () { done(null); };
+    document.head.appendChild(sc);
+  }
+  function indiaItem(r) { return {name: r[0].length > 46 ? r[0].slice(0, 45) + '…' : r[0], url: r[1], meta: [r[2], r[3]].filter(function (q) { return q; }).join(' · ')}; }
+
+  /** Languages first (Hindi, Tamil, Punjabi…, the most stations first), then that language's stations. */
+  function openIndia() {
+    var v = {title: 'All Indian stations', items: [], sel: 0, note: 'Loading…'};
+    study.picker.stack.push(v);
+    renderPicker();
+    indiaLoad(function (all) {
+      if (!study || !study.picker || view() !== v) return;
+      if (!all) { v.note = 'Couldn’t load the list.'; return renderPicker(); }
+      var by = {}, order = [];
+      for (var i = 0; i < all.length; i++) {
+        var lang = (all[i][2] || 'Other').split(',')[0].trim() || 'Other';
+        if (!by[lang]) { by[lang] = []; order.push(lang); }
+        by[lang].push(all[i]);
+      }
+      order.sort(function (a, b) { return by[b].length - by[a].length; });
+      v.items = [{name: 'Every station', meta: all.length + ' stations', rows: all}].concat(order.map(function (l) {
+        return {name: l, meta: by[l].length + ' stations', rows: by[l]};
+      }));
+      v.note = 'Most are relays others run: any can go quiet.';
+      renderPicker();
+    });
+  }
+
   /** Opens a row that leads somewhere: saved, noise, a list, or a list's stations. */
   function openItem(it) {
+    if (it.india) return openIndia();
+    if (it.rows) {
+      study.picker.stack.push({title: it.name, stations: true, sel: 0, note: '', items: it.rows.map(indiaItem)});
+      return renderPicker();
+    }
     if (it.live) {
       study.picker.stack.push({title: 'Live RJs', stations: true, sel: 0, note: '', items: LIVE_RJS.map(function (l) {
         return {name: l.name, url: l.url, meta: liveWhen(l.tz, l.by)};
@@ -2030,6 +2072,29 @@ var Custom = (function () {
   }
 
   /** A podcast's episodes from its open feed, newest first. */
+  /** A search: the Indian list's matches first (loaded for it), then Radio Browser's. */
+  function searchAll(t) {
+    var v = {title: '“' + t + '”', items: [], sel: 0, note: 'Searching…', stations: true}, low = t.toLowerCase(), mine = [], dir = null, left = 2;
+    study.picker.stack.push(v);
+    renderPicker();
+    var done = function () {
+      if (--left || !study || !study.picker || view() !== v) return;
+      var seen = {}, out = [];
+      mine.concat(dir || []).forEach(function (x) { if (!seen[x.url]) { seen[x.url] = true; out.push(x); } });
+      v.items = out;
+      v.note = out.length ? '' : 'Nothing found.';
+      renderPicker();
+    };
+    indiaLoad(function (all) {
+      for (var i = 0; all && i < all.length; i++) if (all[i][0].toLowerCase().indexOf(low) >= 0) mine.push(indiaItem(all[i]));
+      done();
+    });
+    rbGet('/json/stations/search?name=' + encodeURIComponent(t) + '&order=votes&reverse=true&hidebroken=true&limit=150', function (raw) {
+      dir = raw ? stationsFrom(raw) : [];
+      done();
+    });
+  }
+
   function openFeed(it) {
     var v = {title: it.name, items: [], sel: 0, note: 'Loading episodes…', stations: true, episodes: true};
     study.picker.stack.push(v);
@@ -2115,7 +2180,7 @@ var Custom = (function () {
         v.text = t;
         if (t.length < 2) { v.note = 'Type at least two letters.'; renderPicker(); return true; }
         study.picker.stack.pop();
-        openItem({name: '“' + t + '”', q: 'name=' + encodeURIComponent(t) + '&order=votes&reverse=true'});
+        searchAll(t);
         return true;
       }
       if (k === keys.back || k === 27 || k === 65385) { if (f) f.blur(); study.picker.stack.pop(); renderPicker(); return true; }
