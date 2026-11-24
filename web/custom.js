@@ -2470,6 +2470,7 @@ var Custom = (function () {
     if (rates.usd) rl.push(['1 US dollar', rupees(rates.usd, 2), rates.usdChg]);
     if (rates.usdCad) rl.push(['1 US dollar in CAD', 'C$' + rates.usdCad.toFixed(4), rates.usdCadChg]);
     if (rates.goldOz && rates.usd) rl.push(['Gold \u00B7 24k, 10 g', rupees(rates.goldOz * rates.usd / 31.1035 * 10, 0), rates.goldChg]);
+    if (rates.goldOz && rates.usdCad) rl.push(['Gold \u00B7 1 oz in CAD', 'C$' + Math.round(rates.goldOz * rates.usdCad).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','), rates.goldChg]);   // a troy ounce, Canada's usual unit
     if (!rl.length) el('div', 'dim', rg, 'Finding today\u2019s rates\u2026');
     for (i = 0; i < rl.length; i++) {
       var rr = el('div', 'grow', rg);
@@ -2477,7 +2478,7 @@ var Custom = (function () {
       var gv = el('div', 'gv', rr, rl[i][1] + ' ');
       el('span', rl[i][2] >= 0 ? 'up' : 'down', gv, change(rl[i][2]));
     }
-    if (rl.length) el('div', 'note', rg, 'Change since the day before \u00B7 gold at the world price, before India\u2019s duty and GST');
+    if (rl.length) el('div', 'note', rg, 'Change since the day before \u00B7 gold at the world spot price (shops add a premium; in India also duty and GST)');
 
     var ss = el('div', 'tcard sky', left), lines = [];
     el('div', 'kicker', ss, night ? 'Tonight’s sky' : 'The sky');
