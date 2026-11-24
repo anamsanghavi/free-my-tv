@@ -2374,6 +2374,15 @@ var Custom = (function () {
           el('div', 't', h, Data.degrees(w.hours[i].temp));
         }
       }
+      if (w.days && w.days.length) {
+        var dys = el('div', 'days', sw);
+        for (i = 0; i < w.days.length && i < 5; i++) {
+          var dy = el('div', 'dy', dys);
+          el('div', 'at', dy, Data.weekday(w.days[i].at));
+          el('div', 'c', dy, Data.condition(w.days[i].code, true));
+          el('div', 't', dy, Data.degrees(w.days[i].max) + ' / ' + Data.degrees(w.days[i].min));
+        }
+      }
     } else el('div', 'dim', sw, 'No weather right now');
 
     // Scores (left, under the weather)
@@ -2383,7 +2392,7 @@ var Custom = (function () {
     el('div', 'kicker', sc, 'Scores');
     if (!scores.rows) el('div', 'dim', sc, 'Finding today\u2019s games\u2026');
     else if (!scores.rows.length) el('div', 'dim', sc, 'No games to show right now');
-    for (i = 0; scores.rows && i < scores.rows.length; i++) {
+    for (i = 0; scores.rows && i < Math.min(scores.rows.length, weatherAlert ? 5 : 6); i++) {   // a warning banner takes a row's room
       var g = scores.rows[i], gr = el('div', 'grow', sc), gl = el('div', 'gl', gr);
       if (g.live) el('span', 'live', gl, 'LIVE');
       gl.appendChild(document.createTextNode(g.title));
@@ -2401,6 +2410,7 @@ var Custom = (function () {
       el('div', 'ftitle', ft, film.title);
       el('div', 'dim', ft, (film.year ? film.year + ' · ' : '') + (film.where.length ? film.where.slice(0, 2).join(', ') :
         film.rent ? 'to rent or buy' : 'not streaming here'));
+      if (film.overview) el('div', 'fover', sf, film.overview);   // the card takes the column's spare room for this
     }
 
     // Rupee & gold
@@ -2424,11 +2434,12 @@ var Custom = (function () {
     if (window.Sky) {
       var m = Sky.moon(d, c.lat, c.lon), name = '';
       for (i = 0; i < PHASES.length; i++) if (m.phase < PHASES[i][0]) { name = PHASES[i][1]; break; }
+      if (w && w.sunrise && w.sunset) lines.push(['Sunrise \u00B7 sunset', Data.time(w.sunrise) + ' \u00B7 ' + Data.time(w.sunset)]);
       lines.push(['Moon', name + ', ' + Math.round(m.lit * 100) + '% lit']);
       var t = Date.now();
       for (i = 0; i < sky.iss.length; i++) {
         var p = sky.iss[i];
-        if (p.maxEl >= 25 && p.set > t) { lines.push(['Space station', Data.time(p.rise) + ', look ' + Sky.compass(p.riseAz)]); break; }
+        if (p.maxEl >= 25 && p.set > t) { lines.push(['Space station', (new Date(p.rise).toDateString() === new Date().toDateString() ? '' : Data.weekday(p.rise) + ' ') + Data.time(p.rise) + ', look ' + Sky.compass(p.riseAz)]); break; }
       }
       if (auroraWatch()) lines.push(['Aurora', 'possible tonight, look north']);
     }
@@ -2583,6 +2594,14 @@ var Custom = (function () {
     if (sport === 'Tennis' && e.status === 'post') { var w = c.filter(function (x) { return x.winner; })[0]; if (w) { e.summary = String(w.displayName || '').split(' ').pop() + ' won'; c = [w].concat(c.filter(function (x) { return x !== w; })); } }
     var names = c.map(function (x) { return sport === 'Tennis' ? String(x.displayName || x.name || '').split(' ').pop() : x.abbreviation && x.abbreviation.length <= 12 ? x.abbreviation : (x.displayName || x.name || ''); });
     var row = {sport: sport, live: e.status === 'in', title: names.length === 2 ? names[0] + ' v ' + names[1] : (e.shortName || e.name || '')};
+    if (sport === 'Cricket' && e.status !== 'pre') {
+      // "254/3 (14.2/50 ov)": the runs on the right, the overs with the match's own line ("India A won by 7 wkts") below
+      var runs = [], overs = '';
+      for (var k = 0; k < c.length; k++) if (c[k].score) { var m = String(c[k].score).match(/^([^(]+)\s*(?:\(([^)]*)\))?/); runs.push(m ? m[1].trim() : c[k].score); if (m && m[2] && e.status === 'in') overs = m[2].replace(/,.*$/, '').replace(/\//, ' of ').replace(/ ov$/, ' overs'); }
+      row.score = runs.join('  \u00B7  ');
+      row.sub = [(e.fullStatus && e.fullStatus.summary) || e.summary || '', overs].filter(function (x) { return x && x !== 'Result'; }).join(' \u00B7 ');
+      return row;
+    }
     if (e.status === 'pre') { row.sub = when(e.date); row.score = ''; }
     else { row.sub = e.summary || (e.fullStatus && e.fullStatus.type && e.fullStatus.type.shortDetail) || ''; row.score = sport === 'Tennis' ? (c[0] && c[0].score) || '' : sport === 'Cricket' ? c.filter(function (x) { return x.score; }).map(function (x) { return x.score; }).join('  \u00B7  ') : c.map(function (x) { return x.score || '\u2013'; }).join(' \u2013 '); }
     return row;
@@ -2594,19 +2613,26 @@ var Custom = (function () {
     var got = {}, left = 4;
     function one() {
       if (--left) return;
-      scores.rows = [got.cricket, got.football, got.f1, got.tennis].filter(function (r) { return r; });
+      scores.rows = [].concat(got.cricket || [], got.football || [], got.f1 ? [got.f1] : [], got.tennis ? [got.tennis] : []).slice(0, 6);
       if (overlay === 'today') renderToday();
     }
     espnEvents('cricket', function (ev) {
-      var india = ev.filter(function (e) { return /india/i.test(e.name || '') || (e.competitors || []).some(function (c) { return /^india$/i.test(c.displayName || ''); }); });
-      var e = bestEvent(india.length ? india : ev.filter(function (x) { return x.status === 'in'; }));
-      if (e) got.cricket = eventRow('Cricket', e);
+      var india = ev.filter(function (e) { return (e.competitors || []).some(function (c) { return c.isNational && /^India\b/.test(c.displayName || ''); }); });
+      // India's match now (or its result from the last two days), then its next one
+      var recent = india.filter(function (x) { return x.status === 'in' || (x.status === 'post' && Date.now() - Date.parse(x.endDate || x.date) < 48 * 3600000); });
+      var nextUp = india.filter(function (x) { return x.status === 'pre'; }).sort(function (a, b) { return Date.parse(a.date) - Date.parse(b.date); })[0];
+      var e = bestEvent(recent) || (india.length ? null : bestEvent(ev.filter(function (x) { return x.status === 'in'; })));
+      got.cricket = [];
+      if (e) got.cricket.push(eventRow('Cricket', e));
+      if (nextUp) got.cricket.push(eventRow('Cricket', nextUp));
       one();
     });
     espnEvents('soccer', function (ev) {
-      var e = null;
-      for (var i = 0; i < FOOTBALL.length && !e; i++) e = bestEvent(ev.filter(function (x) { return x.league === FOOTBALL[i]; }));
-      if (e) got.football = eventRow('Football', e);
+      // the two best games across the big leagues: live first, then the soonest, the bigger league breaking ties
+      var rank = function (x) { return x.status === 'in' ? 0 : x.status === 'pre' ? 1 : 2; };
+      var list = ev.filter(function (x) { return FOOTBALL.indexOf(x.league) >= 0 && !(x.status === 'post' && Date.now() - Date.parse(x.date) > 36 * 3600000); });
+      list.sort(function (a, b) { return rank(a) - rank(b) || (rank(a) === 1 ? Date.parse(a.date) - Date.parse(b.date) : 0) || FOOTBALL.indexOf(a.league) - FOOTBALL.indexOf(b.league); });
+      if (list.length) got.football = list.slice(0, 2).map(function (x) { return eventRow('Football', x); });
       one();
     });
     espnEvents('tennis', function (ev) {

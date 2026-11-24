@@ -1122,3 +1122,29 @@ html.glass #saver .clock .title.quote span { font-size: 20px !important; }
 html.glass #saver .credit { font-family: 'Inter', Helvetica, Arial, sans-serif; font-style: normal; }
 html.glass #saver .credit b { font-size: 20px; }
 html.glass #menu .mfly, html.glass .night #menu .mfly { background: rgba(28, 33, 45, 0.98); }
+/* Today, filled out: the columns stretch so both end at the bottom; tighter cards; the next five days under the hours */
+#overlay.today.gl .tr { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column; }
+#overlay.today.gl .tcards { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; display: -webkit-box; display: -webkit-flex; display: flex; white-space: normal; font-size: 24px; min-height: 0; }
+#overlay.today.gl .tcol { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column; width: 50%; }
+#overlay.today.gl .tcol > .tcard:last-child { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; margin-bottom: 0; }
+#overlay.today.gl .tcard { margin-bottom: 18px; padding: 22px 28px; overflow: hidden; }
+#overlay.today.gl .talert { margin-bottom: 18px; padding: 14px 24px; }
+#overlay.today.gl .kicker { margin-bottom: 6px; }
+#overlay.today.gl .wx .temp { font-size: 96px; }
+#overlay.today.gl .hours { margin-top: 16px; padding-top: 12px; }
+#overlay.today.gl .hr .t { margin-top: 2px; font-size: 26px; }
+#overlay.today.gl .days { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); white-space: nowrap; font-size: 0; }
+#overlay.today.gl .dy { display: inline-block; width: 20%; text-align: center; vertical-align: top; }
+#overlay.today.gl .dy .at { font-size: 20px; color: rgba(245, 245, 247, 0.7); }
+#overlay.today.gl .dy .c { margin-top: 2px; font-size: 20px; color: rgba(245, 245, 247, 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
+#overlay.today.gl .dy .t { margin-top: 2px; font-size: 24px; font-weight: 500; }
+#overlay.today.gl .grow { padding: 9px 0; }
+#overlay.today.gl .sky .line { padding: 10px 0; }
+#overlay.today.gl .sky .line .v { max-width: 62%; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the right column's spare room goes to the film (its story), not to an empty sky card */
+#overlay.today.gl .tcol > .tcard.sky { -webkit-box-flex: 0; -webkit-flex: 0 0 auto; flex: 0 0 auto; }
+#overlay.today.gl .tcol > .tcard.film { -webkit-box-flex: 1; -webkit-flex: 1 1 auto; flex: 1 1 auto; }
+#overlay.today.gl .tcol > .tcard.rates { margin-bottom: 18px; }
+#overlay.today.gl .fover { margin-top: 16px; font-size: 22px; line-height: 1.45; color: rgba(245, 245, 247, 0.78);
+  display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+#overlay.today.gl .tcard.film { display: block; }   /* the editorial ".film" rule made it a row */
