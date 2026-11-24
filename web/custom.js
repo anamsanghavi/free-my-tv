@@ -30,10 +30,40 @@ var Custom = (function () {
   // the picker's first page; Genres, Countries and Languages are read from Radio Browser, with these first in each
   var STUDY_GENRES = [
     {name: 'Visuals', visuals: true}, {name: 'MilkDrop · next look', nextLook: true}, {name: 'Saved', saved: true},
-    {name: 'Search stations', search: true, meta: 'by name'}, {name: 'Indian FM', fm: true}, {name: 'Podcasts', pods: true, meta: 'stories, horror, RJ shows'},
+    {name: 'Live RJs', live: true, meta: 'India, Mirchi USA, Toronto'}, {name: 'Search stations', search: true, meta: 'by name'}, {name: 'Indian FM', fm: true}, {name: 'Podcasts', pods: true, meta: 'stories, horror, RJ shows'},
     {name: 'Genres', list: 'tags', meta: 'all of them'}, {name: 'Countries', list: 'countries'}, {name: 'Languages', list: 'languages'},
     {name: 'Most played worldwide', q: 'order=clickcount&reverse=true'}, {name: 'Noise · works offline', noise: true}
   ];
+  // Stations with real presenters on air, from their broadcasters' own servers: Prasar Bharati's (All India Radio), Mirchi
+  // USA's and the Toronto-area South Asian stations'. 'tz' says where they broadcast, so the list can say whether it's
+  // daytime there (RJs on air) or the small hours (mostly music): in = India, pt = US Pacific, et = Toronto, mt = Calgary.
+  var AIR = 'https://airhlspush.pc.cdn.bitgravity.com/httppush/';
+  var LIVE_RJS = [
+    {name: 'Vividh Bharati', by: 'All India Radio', tz: 'in', url: 'https://air.pc.cdn.bitgravity.com/air/live/pbaudio001/playlist.m3u8'},
+    {name: 'FM Gold Delhi', by: 'All India Radio', tz: 'in', url: AIR + 'hlspbaudio005/hlspbaudio00564kbps.m3u8'},
+    {name: 'FM Rainbow Delhi', by: 'All India Radio', tz: 'in', url: AIR + 'hlspbaudio004/hlspbaudio00432kbps.m3u8'},
+    {name: 'FM Gold Mumbai', by: 'All India Radio', tz: 'in', url: AIR + 'hlspbaudio007/hlspbaudio007_Auto.m3u8'},
+    {name: 'FM Rainbow Mumbai', by: 'All India Radio', tz: 'in', url: AIR + 'hlspbaudio008/hlspbaudio008_Auto.m3u8'},
+    {name: 'Vividh Bharati Mumbai', by: 'All India Radio', tz: 'in', url: AIR + 'hlspbaudio011/hlspbaudio011_Auto.m3u8'},
+    {name: 'Radio Mirchi USA · Bay Area', by: 'Mirchi', tz: 'pt', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/SFO_HIN_PSTAAC.aac'},
+    {name: 'Radio Mirchi USA · New Jersey', by: 'Mirchi', tz: 'et', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NJS_HIN_ESTAAC.aac'},
+    {name: 'CINA 1650 · Mississauga', by: 'Hindi, Urdu, Punjabi, Gujarati', tz: 'et', url: 'https://ice8.securenetsystems.net/CINA'},
+    {name: 'Radio Humsafar 1350 · Brampton', by: 'Hindi, Punjabi', tz: 'et', url: 'https://ice66.securenetsystems.net/CIRF'},
+    {name: 'Red FM 106.7 · Calgary', by: 'Red FM Canada', tz: 'mt', url: 'https://ice10.securenetsystems.net/CKYR'},
+    {name: 'Red FM 93.1 · Vancouver', by: 'Red FM Canada', tz: 'pt', url: 'https://ice24.securenetsystems.net/CKYE'},
+    {name: 'Club Mirchi', by: 'Mirchi India\u2019s own stream, mostly music', tz: '', url: 'https://mirchiplaylive.akamaized.net/hls/live/2036929-b/MUM/CLUBMI_Auto.m3u8'}
+  ];
+
+  /** "9:40 pm there · RJs on air" or "3:10 am there · night music": the station's local time, with this TV's clock as
+   *  Toronto's (Pacific 3 hours behind, Mountain 2; India at UTC+5:30, no daylight saving). */
+  function liveWhen(tz, by) {
+    if (!tz) return by;
+    var now = new Date(), t = tz === 'in' ? new Date(now.getTime() + (now.getTimezoneOffset() + 330) * 60000) :
+      new Date(now.getTime() - (tz === 'pt' ? 3 : tz === 'mt' ? 2 : 0) * 3600000);
+    var h = t.getHours(), m = t.getMinutes(), day = h >= 6 && h < 23;
+    return by + ' · ' + ((h % 12) || 12) + ':' + pad(m) + (h < 12 ? ' am' : ' pm') + ' there · ' + (day ? 'RJs on air' : 'night, mostly music');
+  }
+
   // the big Indian FM brands, found in Radio Browser by name (which streams are official isn't known: some are relays)
   var INDIAN_FM = [
     {name: 'Radio Mirchi', q: 'name=mirchi'}, {name: 'Red FM', q: 'name=red%20fm'}, {name: 'Radio City', q: 'name=radio%20city'},
@@ -1375,7 +1405,7 @@ var Custom = (function () {
 
   function tapMaybe() {
     var snd = study.current;
-    if (MEDIA_TAP || study.paused || study.visMode === 'off' || !snd || !snd.url || snd.episode || !/^https?:/.test(snd.url) || study.noTap[snd.url]) return;
+    if (MEDIA_TAP || study.paused || study.visMode === 'off' || !snd || !snd.url || snd.episode || /\.m3u8/.test(snd.url) || !/^https?:/.test(snd.url) || study.noTap[snd.url]) return;
     if (study.tap && study.tap.url === snd.url) return;
     if (!visGraph()) return;
     tapStop();
@@ -1943,6 +1973,12 @@ var Custom = (function () {
 
   /** Opens a row that leads somewhere: saved, noise, a list, or a list's stations. */
   function openItem(it) {
+    if (it.live) {
+      study.picker.stack.push({title: 'Live RJs', stations: true, sel: 0, note: '', items: LIVE_RJS.map(function (l) {
+        return {name: l.name, url: l.url, meta: liveWhen(l.tz, l.by)};
+      })});
+      return renderPicker();
+    }
     if (it.fm) { study.picker.stack.push({title: 'Indian FM', items: INDIAN_FM.map(function (f) { return {name: f.name, q: f.q + '&order=votes&reverse=true'}; }), sel: 0, note: ''}); return renderPicker(); }
     if (it.pods) { study.picker.stack.push({title: 'Podcasts', items: PODCASTS.map(function (p) { return {name: p.name, meta: p.by, feed: p.feed, eps: p.eps, yt: p.yt, yts: p.yts}; }), sel: 0, note: ''}); return renderPicker(); }
     if (it.eps) {
