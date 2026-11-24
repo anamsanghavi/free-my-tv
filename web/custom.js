@@ -796,7 +796,7 @@ var Custom = (function () {
   function tmdb(path, done) {
     var key = tmdbKey();
     var bearer = key.indexOf('eyJ') === 0;
-    var url = 'https://api.themoviedb.org/3' + path + (bearer ? '' : (path.indexOf('?') >= 0 ? '&' : '?') + 'api_key=' + encodeURIComponent(key));
+    var url = 'https://api.tmdb.org/3' + path + (bearer ? '' : (path.indexOf('?') >= 0 ? '&' : '?') + 'api_key=' + encodeURIComponent(key));
     get(url, bearer ? {Authorization: 'Bearer ' + key, Accept: 'application/json'} : {Accept: 'application/json'}, done);
   }
 
@@ -2315,8 +2315,12 @@ var Custom = (function () {
   var PHASES = [[0.03, 'New moon'], [0.22, 'Waxing crescent'], [0.28, 'First quarter'], [0.47, 'Waxing gibbous'], [0.53, 'Full moon'],
     [0.72, 'Waning gibbous'], [0.78, 'Last quarter'], [0.97, 'Waning crescent'], [1.01, 'New moon']];
 
+  var todayTimer = 0;
+
   function openToday() {
     overlay = 'today';
+    clearInterval(todayTimer);
+    todayTimer = setInterval(function () { if (overlay === 'today') { refreshScores(); refreshRates(); } }, 60000);   // fresh scores while it's open
     renderToday();
     overlayState();
   }
@@ -2439,6 +2443,7 @@ var Custom = (function () {
 
   function closeOverlay() {
     if (overlay === 'game') stopGame();
+    clearInterval(todayTimer);
     overlay = null;
     overlayState();
     var o = $('overlay');
@@ -2477,8 +2482,9 @@ var Custom = (function () {
       el('span', 'g-name', r, rows[i].label);
       if (rows[i].field) {
         var f = el('input', '', r);
-        f.type = 'text';
-        f.value = guest[rows[i].field] !== undefined ? guest[rows[i].field] : rows[i].value;
+        f.type = rows[i].field === 'pass' ? 'password' : 'text';   // the password never shows on screen
+        f.value = guest[rows[i].field] !== undefined ? guest[rows[i].field] : rows[i].field === 'pass' ? '' : rows[i].value;
+        if (rows[i].field === 'pass' && wifi && wifi.pass) f.setAttribute('placeholder', 'Unchanged \u00B7 type to replace');
         f.setAttribute('data-field', rows[i].field);
         f.setAttribute('autocomplete', 'off');
         f.setAttribute('spellcheck', 'false');
@@ -2498,7 +2504,7 @@ var Custom = (function () {
   function saveWifi() {
     keepTyped();
     var sec = guest.sec || (wifi && wifi.sec) || 'WPA', ssid = String(guest.ssid !== undefined ? guest.ssid : (wifi ? wifi.ssid : '')).trim();
-    var pass = String(guest.pass !== undefined ? guest.pass : (wifi ? wifi.pass : ''));
+    var pass = String(guest.pass !== undefined && guest.pass !== '' ? guest.pass : (wifi ? wifi.pass : ''));   // empty keeps the saved one
     if (!ssid) { if (hooks.toast) hooks.toast('Type the network name first.'); guest.row = 0; renderGuest(); return; }
     if (sec !== 'nopass' && !pass) { if (hooks.toast) hooks.toast('Type the password, or set Security to No password.'); guest.row = 1; renderGuest(); return; }
     wifi = {ssid: ssid, pass: sec === 'nopass' ? '' : pass, sec: sec};
@@ -2546,7 +2552,7 @@ var Custom = (function () {
   // European Central Bank (Frankfurter), every 6 hours. Gold from Binance's PAXG (a token backed by one troy ounce of
   // gold), every 10 minutes: the world price in rupees, before India's import duty and GST, which local rates include.
 
-  var scores = {at: 0, rows: null}, rates = {fxAt: 0, goldAt: 0, cad: 0, usd: 0, cadChg: 0, usdChg: 0, gold: 0, goldChg: 0};
+  var scores = {at: 0, rows: null}, rates = {fxNext: 0, goldNext: 0, cad: 0, usd: 0, cadChg: 0, usdChg: 0, goldOz: 0, goldChg: 0};
   var ESPN = 'https://site.web.api.espn.com/apis/v2/scoreboard/header?lang=en&region=in&sport=';
   var FOOTBALL = ['eng.1', 'uefa.champions', 'esp.1', 'ind.1', 'ger.1', 'ita.1', 'fifa.world', 'usa.1'];
 
@@ -2573,10 +2579,12 @@ var Custom = (function () {
   }
 
   function eventRow(sport, e) {
-    var c = e.competitors || [], names = c.map(function (x) { return x.abbreviation && x.abbreviation.length <= 12 ? x.abbreviation : (x.displayName || x.name || ''); });
+    var c = e.competitors || [];
+    if (sport === 'Tennis' && e.status === 'post') { var w = c.filter(function (x) { return x.winner; })[0]; if (w) { e.summary = String(w.displayName || '').split(' ').pop() + ' won'; c = [w].concat(c.filter(function (x) { return x !== w; })); } }
+    var names = c.map(function (x) { return sport === 'Tennis' ? String(x.displayName || x.name || '').split(' ').pop() : x.abbreviation && x.abbreviation.length <= 12 ? x.abbreviation : (x.displayName || x.name || ''); });
     var row = {sport: sport, live: e.status === 'in', title: names.length === 2 ? names[0] + ' v ' + names[1] : (e.shortName || e.name || '')};
     if (e.status === 'pre') { row.sub = when(e.date); row.score = ''; }
-    else { row.sub = e.summary || (e.fullStatus && e.fullStatus.type && e.fullStatus.type.shortDetail) || ''; row.score = sport === 'Tennis' ? (c[0] && c[0].score) || '' : sport === 'Cricket' ? c.filter(function (x) { return x.score; }).map(function (x) { return x.score; }).join('  \u00B7  ') : c.map(function (x) { return x.score || '0'; }).join(' \u2013 '); }
+    else { row.sub = e.summary || (e.fullStatus && e.fullStatus.type && e.fullStatus.type.shortDetail) || ''; row.score = sport === 'Tennis' ? (c[0] && c[0].score) || '' : sport === 'Cricket' ? c.filter(function (x) { return x.score; }).map(function (x) { return x.score; }).join('  \u00B7  ') : c.map(function (x) { return x.score || '\u2013'; }).join(' \u2013 '); }
     return row;
   }
 
@@ -2611,7 +2619,7 @@ var Custom = (function () {
       if (e) {
         var cs = e.competitions || [], next = null, race = cs[cs.length - 1];
         for (var i = 0; i < cs.length && !next; i++) if (cs[i].status && cs[i].status.type && cs[i].status.type.state !== 'post') next = cs[i];
-        var name = String(e.name || '').replace(/^\S+\s(?=\S+.*Grand Prix)/, '').replace(/^Heineken |^Aramco |^Qatar Airways |^Pirelli /, '');
+        var name = String(e.name || '').replace(/^Formula 1\s+/, '').replace(/\s+\d{4}$/, '').replace(/^(Heineken|Aramco|Qatar Airways|Pirelli|Crypto\.com|AWS|MSC Cruises|Lenovo|Louis Vuitton|Gulf Air|STC|Etihad Airways|Rolex|Singapore Airlines)\s+/i, '');
         var row = {sport: 'F1', live: !!(next && next.status.type.state === 'in'), title: name.replace(/Grand Prix/, 'GP')};
         if (next) { row.sub = (next.type && next.type.abbreviation === 'Qual' ? 'Qualifying' : next.type && next.type.abbreviation === 'Race' ? 'Race' : (next.type && next.type.abbreviation) || ''); row.score = row.live ? 'live' : when(next.date); }
         else {
@@ -2624,28 +2632,36 @@ var Custom = (function () {
     }, 10000);
   }
 
+  var RETRY = 5 * 60000;
+
   function refreshRates() {
     var now = Date.now();
-    if (now - rates.fxAt > 6 * 3600000) {
-      rates.fxAt = now;
+    if (now >= rates.fxNext) {
+      rates.fxNext = now + RETRY;   // a failure waits 5 minutes; a success, 6 hours
       get('https://api.frankfurter.dev/v1/' + isoDay(-8) + '..?base=INR&symbols=CAD,USD', {Accept: 'application/json'}, function (err, body) {
         var days = !err && body && body.rates ? Object.keys(body.rates).sort() : [];
-        if (days.length) {
-          var a = body.rates[days[days.length - 1]], b = body.rates[days[Math.max(0, days.length - 2)]];
-          rates.cad = 1 / a.CAD; rates.usd = 1 / a.USD;
-          rates.cadChg = (b.CAD / a.CAD - 1) * 100; rates.usdChg = (b.USD / a.USD - 1) * 100;
-          rates.fxDay = days[days.length - 1];
-        } else rates.fxAt = 0;
+        if (!days.length) return;
+        var a = body.rates[days[days.length - 1]], b = body.rates[days[Math.max(0, days.length - 2)]];
+        if (!a || !a.CAD || !a.USD) return;
+        rates.cad = 1 / a.CAD; rates.usd = 1 / a.USD;
+        rates.cadChg = b && b.CAD ? (b.CAD / a.CAD - 1) * 100 : 0; rates.usdChg = b && b.USD ? (b.USD / a.USD - 1) * 100 : 0;
+        rates.fxNext = Date.now() + 6 * 3600000;
         if (overlay === 'today') renderToday();
       }, 10000);
     }
-    if (now - rates.goldAt > 10 * 60000) {
-      rates.goldAt = now;
-      get('https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT', {}, function (err, body) {
-        if (!err && body && body.lastPrice) { rates.goldOz = parseFloat(body.lastPrice); rates.goldChg = parseFloat(body.priceChangePercent) || 0; }
-        else rates.goldAt = 0;
-        if (overlay === 'today') renderToday();
-      }, 10000);
+    if (now >= rates.goldNext) {
+      rates.goldNext = now + RETRY;
+      // as data.js: Binance.com refuses some countries; the same call answers on its data mirror and on Binance.US
+      var hosts = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api.binance.us'], h = 0;
+      (function next() {
+        if (h >= hosts.length) return;
+        get(hosts[h++] + '/api/v3/ticker/24hr?symbol=PAXGUSDT', {}, function (err, body) {
+          if (err || !body || !body.lastPrice) { next(); return; }
+          rates.goldOz = parseFloat(body.lastPrice); rates.goldChg = parseFloat(body.priceChangePercent) || 0;
+          rates.goldNext = Date.now() + 10 * 60000;
+          if (overlay === 'today') renderToday();
+        }, 10000);
+      })();
     }
   }
 
@@ -2732,9 +2748,10 @@ var Custom = (function () {
     if (!tmdbKey()) {
       el('div', 'mtitle', hero, 'Movie night');
       el('div', 'over', hero, 'Add your free TMDB key in Settings › TMDB key, and new films on your services and Bollywood films show up here.');
+      el('div', 'hint', o, 'Back to close');
       return;
     }
-    if (!it) { el('div', 'over', hero, mv.lists[mv.row] ? 'Nothing here right now.' : 'Finding films…'); return; }
+    if (!it) { el('div', 'over', hero, mv.lists[mv.row] ? 'Nothing here right now.' : 'Finding films…'); el('div', 'hint', o, '\u2191 \u2193 rows  \u00B7  Back to close'); return; }
     el('div', 'kick', hero, mv.row === 0 ? 'New on your services' : 'Bollywood');
     el('div', 'mtitle', hero, it.title);
     el('div', 'meta', hero, [it.year, it.rating ? '★ ' + it.rating : ''].filter(function (x) { return x; }).join(' · '));

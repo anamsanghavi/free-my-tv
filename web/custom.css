@@ -1099,3 +1099,26 @@ html.glass #saver .clock .hint { font-size: 20px; }
 #overlay.today.gl .rates .gl { max-width: 50%; }
 #overlay.today.gl .rates .gv { max-width: 50%; }
 #overlay.today.gl .note { margin-top: 8px; font-size: 20px; line-height: 1.35; color: rgba(245, 245, 247, 0.5); }
+
+/* ---- QA fixes (Nov 24 2026) ---- */
+/* a weather warning on the resting screen: the editorial cream wash gave way to the glass shade, the pill dark glass */
+html.glass.alert-on #stage.dio #wallshade, html.glass.alert-on #stage.dio.dio-light #wallshade {
+  background: linear-gradient(20deg, rgba(5, 7, 12, 0.82) 0%, rgba(5, 7, 12, 0.45) 32%, rgba(5, 7, 12, 0) 62%) !important; }
+/* after dark a day scene is dimmed as before, the glass shade over it */
+html.glass .night #stage.dio.dio-dim #wallshade, html.glass.alert-on .night #stage.dio.dio-dim #wallshade {
+  background: linear-gradient(20deg, rgba(5, 7, 12, 0.82) 0%, rgba(5, 7, 12, 0.45) 32%, rgba(5, 7, 12, 0) 62%), linear-gradient(rgba(9, 6, 4, 0.5), rgba(9, 6, 4, 0.5)) !important; }
+html.glass #alertbar, html.glass #stage.dio-light #alertbar { background: rgba(18, 22, 30, 0.74) !important; border-color: rgba(159, 227, 220, 0.6); color: #DDF5F2 !important; }
+html.glass #alertbar:not(.sky), html.glass #stage.dio-light #alertbar:not(.sky) { background: rgba(18, 22, 30, 0.74) !important; border-color: rgba(242, 196, 107, 0.7); color: #FBE6B8 !important; }
+/* the weather pill was hidden by the editorial rule */
+html.glass #rest .wx, html.glass #stage.dio-light #rest .wx { display: block; }
+html.glass #rest .wx:empty { display: none; }
+/* Movie night: the title on one line, so the button never reaches the row */
+#overlay.movies.gl .mtitle { -webkit-line-clamp: 1; font-size: 72px; }
+#overlay.movies.gl .over { -webkit-line-clamp: 2; }
+/* text under 20 px, and the photo credit in Inter */
+#overlay.today.gl .live { font-size: 18px; }
+html.glass #overlay.game .cta .keycap { font-size: 20px; }
+html.glass #saver .clock .title.quote span { font-size: 20px !important; }
+html.glass #saver .credit { font-family: 'Inter', Helvetica, Arial, sans-serif; font-style: normal; }
+html.glass #saver .credit b { font-size: 20px; }
+html.glass #menu .mfly, html.glass .night #menu .mfly { background: rgba(28, 33, 45, 0.98); }

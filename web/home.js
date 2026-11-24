@@ -2192,7 +2192,8 @@
     var d = new Date();
     // by class, not position: the glass layer (custom.js) adds a child of its own
     clock.querySelector('.time').textContent = formatDate('format|h:mm', d.getTime());
-    clock.querySelector('.date').textContent = formatDate('format|EEEE, MMMM d', d.getTime());
+    var wx = ED ? wxWords(', ', true) : '';   // Local addition: the weather on the date's line, as on the menu
+    clock.querySelector('.date').textContent = ED && wx ? formatDate('format|EEEE', d.getTime()) + ' \u00B7 ' + wx : formatDate('format|EEEE, MMMM d', d.getTime());
   }
 
   function hideSaver() {
