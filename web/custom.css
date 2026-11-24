@@ -1148,3 +1148,51 @@ html.glass #menu .mfly, html.glass .night #menu .mfly { background: rgba(28, 33,
 #overlay.today.gl .fover { margin-top: 16px; font-size: 22px; line-height: 1.45; color: rgba(245, 245, 247, 0.78);
   display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
 #overlay.today.gl .tcard.film { display: block; }   /* the editorial ".film" rule made it a row */
+/* the line under a game runs the card's full width, under both the teams and the score */
+#overlay.today.gl .scores .grow .gs { clear: both; padding-top: 2px; white-space: nowrap; }
+/* Scores: your teams as two tiles (where they stand, the last result with W/D/L and its competition, what's next),
+   then a scoreboard: each game's competition, its sides stacked with their scores, its state on the right */
+#overlay.today.gl .scores .cap { margin: 10px 0 8px; font-size: 18px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(245, 245, 247, 0.5); }
+#overlay.today.gl .scores .mine { display: -webkit-box; display: -webkit-flex; display: flex; }
+#overlay.today.gl .scores .team { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; box-sizing: border-box; padding: 12px 16px; border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); }
+#overlay.today.gl .scores .team + .team { margin-left: 14px; }
+#overlay.today.gl .scores .th { font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .scores .crest { display: inline-block; width: 30px; height: 30px; margin-right: 10px; border-radius: 15px; line-height: 30px; text-align: center;
+  font-size: 11px; font-weight: 700; color: #FFFFFF; vertical-align: 2px; }
+#overlay.today.gl .scores .stand { margin-top: 2px; font-size: 18px; color: #9FE3DC; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .scores .res { margin-top: 8px; font-size: 21px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .scores .wdl { display: inline-block; width: 26px; height: 26px; margin-right: 8px; border-radius: 7px; line-height: 26px; text-align: center;
+  font-size: 15px; font-weight: 700; color: #0B0D12; vertical-align: 1px; }
+#overlay.today.gl .scores .wdl.w { background: #7FE0A0; }
+#overlay.today.gl .scores .wdl.d { background: #C9CED8; }
+#overlay.today.gl .scores .wdl.l { background: #FF8A8A; }
+#overlay.today.gl .scores .res .live { margin-right: 8px; }
+#overlay.today.gl .scores .comp { margin-top: 2px; font-size: 18px; color: rgba(245, 245, 247, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .scores .next { margin-top: 6px; font-size: 19px; color: rgba(245, 245, 247, 0.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .scores .game { padding: 8px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+#overlay.today.gl .scores .cap + .game { border-top: 0; padding-top: 2px; }
+#overlay.today.gl .scores .gc { font-size: 17px; font-weight: 600; letter-spacing: 0.06em; color: rgba(245, 245, 247, 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .scores .gb { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; margin-top: 2px; }
+#overlay.today.gl .scores .lines { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; }
+#overlay.today.gl .scores .ln { font-size: 22px; line-height: 1.3; overflow: hidden; white-space: nowrap; color: rgba(245, 245, 247, 0.85); }
+#overlay.today.gl .scores .ln.lead { color: #FFFFFF; font-weight: 600; }
+#overlay.today.gl .scores .ln .n { float: left; max-width: 70%; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .scores .ln b { float: right; font-weight: 500; -webkit-font-feature-settings: 'tnum'; font-feature-settings: 'tnum'; }
+#overlay.today.gl .scores .st { width: 110px; margin-left: 16px; text-align: right; font-size: 18px; color: rgba(245, 245, 247, 0.65); }
+#overlay.today.gl .scores .gn { margin-top: 2px; font-size: 18px; color: rgba(245, 245, 247, 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .scores .stand, #overlay.today.gl .scores .comp, #overlay.today.gl .scores .gn, #overlay.today.gl .scores .st { font-size: 19px; }
+#overlay.today.gl .scores .gc { font-size: 18px; }
+/* a long result or next match wraps (two lines at most) rather than being cut */
+#overlay.today.gl .scores .res, #overlay.today.gl .scores .next { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#overlay.today.gl .scores .st .sn { margin-top: 4px; font-size: 18px; color: rgba(245, 245, 247, 0.6); white-space: nowrap; }
+/* without the film: weather, rates and the sky on the left (the sky reaches the bottom), Scores the whole right column */
+#overlay.today.gl .tcol > .tcard.sky { -webkit-box-flex: 1; -webkit-flex: 1 1 auto; flex: 1 1 auto; margin-bottom: 0; }
+#overlay.today.gl .scores .up { padding: 8px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); white-space: nowrap; overflow: hidden; }
+#overlay.today.gl .scores .upcap + .up { border-top: 0; padding-top: 2px; }
+#overlay.today.gl .scores .up .uw { display: inline-block; width: 170px; font-size: 20px; color: #9FE3DC; vertical-align: top; }
+#overlay.today.gl .scores .up .ut { font-size: 22px; }
+#overlay.today.gl .scores .up .uc { margin-left: 170px; font-size: 18px; color: rgba(245, 245, 247, 0.55); overflow: hidden; text-overflow: ellipsis; }
+/* cards keep their height; only the last card of a column gives way (and fitScores trims what's in it) */
+#overlay.today.gl .tcol > .tcard { -webkit-flex-shrink: 0; flex-shrink: 0; }
+#overlay.today.gl .tcol > .tcard:last-child { -webkit-flex-shrink: 1; flex-shrink: 1; min-height: 0; }
