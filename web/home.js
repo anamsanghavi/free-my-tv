@@ -2334,7 +2334,17 @@
   I18N.set(Prefs.language());
   direction();
   I18N.setClock(Prefs.clockFormat());
-  if (window.Custom) Custom.init({toast: toast, redraw: renderDrawer, panels: renderPanels, night: checkNight});   // Local addition
+  // Local addition: a streaming service's name (TMDB's, e.g. "Amazon Prime Video") to the TV's app for it, opened
+  function openService(name) {
+    var n = String(name).toLowerCase(), key = n.indexOf('netflix') >= 0 ? 'netflix' : n.indexOf('amazon') >= 0 || n.indexOf('prime') >= 0 ? 'prime' :
+      n.indexOf('disney') >= 0 ? 'disney' : n.indexOf('apple') >= 0 ? 'apple tv' : n.indexOf('crave') >= 0 ? 'crave' : n.split(' ')[0];
+    for (var i = 0; i < apps.length; i++) {
+      var t = ((apps[i].id || '') + ' ' + (apps[i].title || '')).toLowerCase();
+      if (t.indexOf(key) >= 0 || (key === 'prime' && t.indexOf('amazon') >= 0)) { launcher(apps[i].id, apps[i].title)(); return true; }
+    }
+    return false;
+  }
+  if (window.Custom) Custom.init({toast: toast, redraw: renderDrawer, panels: renderPanels, night: checkNight, openService: openService});   // Local addition
   checkNight();   // now, from the last forecast: not after the TV lists its apps, with the day look until then
   // LG's screensaver waits only when ours will show: not under a sheet (ours waits there), and not without photos.
   TV.holdScreenSaver(function () { return (window.Custom && Custom.busy()) || !sheetOpen() && (saverMode() === 'clock' || !!window.Custom || saverPhotos().length > 0); });

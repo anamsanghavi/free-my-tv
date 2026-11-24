@@ -2307,53 +2307,75 @@ var Custom = (function () {
     return sec;
   }
 
+  /** Today, Cinema glass: the title bottom left over the diorama; on the right a warning (when there is one) and glass cards. */
   function renderToday() {
     var o = $('overlay'), d = new Date(), w = null, c = coords(), i;
     try { w = Data.weather; } catch (e) {}
     o.innerHTML = '';
-    o.className = 'on page today';
-    el('div', 'fade', o);
-    var col = el('div', 'col', o);
+    o.className = 'on page today gl';
+    el('div', 'gshade', o);
     var part = d.getHours() < 12 ? 'morning' : d.getHours() < 17 ? 'afternoon' : 'evening';
-    el('div', 'ptitle', col, night ? 'Tonight' : 'Today');
-    el('div', 'psub', col, ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] + ' ' + part);
+    var tl = el('div', 'tl', o);
+    el('div', 'ptitle', tl, night ? 'Tonight' : 'Today');
+    el('div', 'psub', tl, ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] + ' ' + part);
+    el('div', 'pfoot', tl, 'Back to the menu');
+    var tr = el('div', 'tr', o);
+    if (weatherAlert) {
+      var al = el('div', 'talert ' + (weatherAlert.colour || 'yellow'), tr);
+      el('b', '', al, weatherAlert.name.charAt(0).toUpperCase() + weatherAlert.name.substring(1));
+      el('span', '', al, ' · Environment Canada' + (weatherAlert.area ? ' · ' + weatherAlert.area : ''));
+    }
+    var cards = el('div', 'tcards', tr), left = el('div', 'tcol', cards), right = el('div', 'tcol', cards);
 
-    var sw = section(col, 'Weather');
+    var sw = el('div', 'tcard wx', left);
+    el('div', 'kicker', sw, 'Weather');
     if (w) {
-      el('div', 'big', sw, Data.degrees(w.temp) + ', ' + Data.condition(w.code, w.isDay).toLowerCase());
+      var now = el('div', 'now', sw);
+      el('div', 'temp', now, Data.degrees(w.temp));
+      var nd = el('div', 'nd', now);
+      el('div', 'cond', nd, Data.condition(w.code, w.isDay));
       var bits = [];
-      if (w.max !== undefined && w.min !== undefined) bits.push('high ' + Data.degrees(w.max) + ' \u00B7 low ' + Data.degrees(w.min));
+      if (w.max !== undefined && w.min !== undefined) bits.push('high ' + Data.degrees(w.max) + ', low ' + Data.degrees(w.min));
       if (night && w.sunrise) bits.push('sunrise ' + Data.time(w.sunrise));
       else if (w.sunset) bits.push('sunset ' + Data.time(w.sunset));
-      el('div', 'dim', sw, bits.join(' \u00B7 '));
+      el('div', 'dim', nd, bits.join(' · '));
+      if (w.hours && w.hours.length) {
+        var hrs = el('div', 'hours', sw);
+        for (i = 0; i < w.hours.length; i++) {
+          var h = el('div', 'hr', hrs);
+          el('div', 'at', h, Data.hour(w.hours[i].at));
+          el('div', 't', h, Data.degrees(w.hours[i].temp));
+        }
+      }
     } else el('div', 'dim', sw, 'No weather right now');
 
-    var sf = section(col, 'Film of the day');
-    if (!tmdbKey()) el('div', 'dim', sf, 'Add your TMDB key in Settings to see a film here.');
-    else if (!film || !film.title) el('div', 'dim', sf, 'Finding today\u2019s film\u2026');
+    var sf = el('div', 'tcard film', right);
+    var fr = el('div', 'frow', sf), poster = el('div', 'poster', fr), ft = el('div', 'ftext', fr);
+    el('div', 'kicker', ft, 'Film of the day');
+    if (!tmdbKey()) { poster.style.display = 'none'; el('div', 'dim', ft, 'Add your TMDB key in Settings to see a film here.'); }
+    else if (!film || !film.title) { poster.style.display = 'none'; el('div', 'dim', ft, 'Finding today’s film…'); }
     else {
-      var fr = el('div', 'film', sf);
-      if (film.poster) el('div', 'poster', fr).style.backgroundImage = 'url("' + film.poster + '")';
-      var ft = el('div', 'ftext', fr);
+      if (film.poster) poster.style.backgroundImage = 'url("' + film.poster + '")';
       el('div', 'ftitle', ft, film.title);
-      el('div', 'dim', ft, (film.year ? film.year + ' \u00B7 ' : '') + (film.where.length ? film.where.slice(0, 2).join(', ') :
+      el('div', 'dim', ft, (film.year ? film.year + ' · ' : '') + (film.where.length ? film.where.slice(0, 2).join(', ') :
         film.rent ? 'to rent or buy' : 'not streaming here'));
     }
 
-    var ss = section(col, 'Sky'), lines = [];
+    var ss = el('div', 'tcard sky', right), lines = [];
+    el('div', 'kicker', ss, night ? 'Tonight’s sky' : 'The sky');
     if (window.Sky) {
       var m = Sky.moon(d, c.lat, c.lon), name = '';
       for (i = 0; i < PHASES.length; i++) if (m.phase < PHASES[i][0]) { name = PHASES[i][1]; break; }
-      lines.push(name + ', ' + Math.round(m.lit * 100) + '% lit');
-      var now = Date.now();
+      lines.push(['Moon', name + ', ' + Math.round(m.lit * 100) + '% lit']);
+      var t = Date.now();
       for (i = 0; i < sky.iss.length; i++) {
         var p = sky.iss[i];
-        if (p.maxEl >= 25 && p.set > now) { lines.push('Space station ' + Data.time(p.rise) + ', look ' + Sky.compass(p.riseAz)); break; }
+        if (p.maxEl >= 25 && p.set > t) { lines.push(['Space station', Data.time(p.rise) + ', look ' + Sky.compass(p.riseAz)]); break; }
       }
-      if (auroraWatch()) lines.push('Aurora possible, look north');
+      if (auroraWatch()) lines.push(['Aurora', 'possible tonight, look north']);
     }
-    for (i = 0; i < lines.length; i++) el('div', 'line', ss, lines[i]);
-    el('div', 'pfoot', col, 'Back to the menu');
+    if (!lines.length) el('div', 'dim', ss, 'Nothing to see right now');
+    for (i = 0; i < lines.length; i++) { var ln = el('div', 'line', ss); el('span', 'k', ln, lines[i][0]); el('span', 'v', ln, lines[i][1]); }
   }
 
   function todayKey(k, keys) {
@@ -2463,6 +2485,122 @@ var Custom = (function () {
       if (guest.row === 3) { saveWifi(); return true; }
       var input = $('overlay').querySelectorAll('input')[guest.row];
       if (input) { input.focus(); try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {} }
+      return true;
+    }
+    return true;
+  }
+
+  // MARK: - Movie night (Cinema glass): films new on the TV's services in Canada, and Bollywood, from TMDB. A big film
+  // up top (its backdrop behind), a poster row below. ← → move along the row, ↑ ↓ change the row, OK opens the film's
+  // app, Back closes. Each row is fetched once every 6 hours; where a film streams is asked only for the one in focus.
+
+  var MV_ROWS = [
+    {name: 'New on your services', path: function () {
+      return '/discover/movie?include_adult=false&watch_region=CA&with_watch_monetization_types=flatrate&with_watch_providers=8%7C119%7C337%7C350' +
+        '&sort_by=popularity.desc&vote_count.gte=20&primary_release_date.gte=' + isoDay(-240) + '&primary_release_date.lte=' + isoDay(0);
+    }},
+    {name: 'Bollywood', path: function () {
+      return '/discover/movie?include_adult=false&with_original_language=hi&sort_by=popularity.desc&vote_count.gte=10' +
+        '&primary_release_date.gte=' + isoDay(-540) + '&primary_release_date.lte=' + isoDay(0);
+    }}
+  ];
+  var mv = {row: 0, sel: [0, 0], lists: [null, null], at: [0, 0], first: [0, 0]}, mvTimer = 0, MV_SHOWN = 8;
+
+  function isoDay(offset) { var d = new Date(Date.now() + offset * 86400000); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+
+  function openMovies() {
+    if (movie) { movie = false; store('movie', false); setClass(document.documentElement, 'movie', false); }   // the old Movie night (a dark home screen) is gone
+    overlay = 'movies';
+    overlayState();
+    for (var r = 0; r < MV_ROWS.length; r++) mvFetch(r);
+    renderMovies();
+  }
+
+  function mvFetch(r) {
+    if (!tmdbKey() || (mv.lists[r] && Date.now() - mv.at[r] < 6 * 3600000)) return;
+    mv.at[r] = Date.now();
+    tmdb(MV_ROWS[r].path(), function (err, body) {
+      if (err || !body || !body.results) { if (!mv.lists[r]) mv.lists[r] = []; mv.at[r] = 0; }
+      else mv.lists[r] = body.results.filter(function (m) { return m.poster_path; }).slice(0, 20).map(function (m) {
+        return {id: m.id, title: m.title || m.original_title, year: (m.release_date || '').slice(0, 4), overview: m.overview || '',
+          rating: m.vote_average ? Math.round(m.vote_average * 10) / 10 : 0,
+          poster: 'https://image.tmdb.org/t/p/w342' + m.poster_path, backdrop: m.backdrop_path ? 'https://image.tmdb.org/t/p/w1280' + m.backdrop_path : '', where: null};
+      });
+      if (overlay === 'movies') { renderMovies(); mvWhereSoon(); }
+    });
+  }
+
+  /** Where the focused film streams in Canada, asked once it has rested in focus for a moment. */
+  function mvWhereSoon() {
+    clearTimeout(mvTimer);
+    mvTimer = setTimeout(function () {
+      var it = mvItem();
+      if (!it || it.where) return;
+      it.where = [];
+      it.asking = true;
+      tmdb('/movie/' + it.id + '/watch/providers', function (err, prov) {
+        it.asking = false;
+        var ca = !err && prov && prov.results && prov.results.CA, list = ca ? (ca.flatrate || []).concat(ca.free || [], ca.ads || []) : [];
+        for (var i = 0; i < list.length && it.where.length < 3; i++) if (it.where.indexOf(list[i].provider_name) < 0) it.where.push(list[i].provider_name);
+        if (overlay === 'movies' && mvItem() === it) renderMovies();
+      });
+    }, 350);
+  }
+
+  function mvItem() { var l = mv.lists[mv.row]; return l && l.length ? l[Math.min(mv.sel[mv.row], l.length - 1)] : null; }
+
+  function renderMovies() {
+    var o = $('overlay'), it = mvItem(), i;
+    o.innerHTML = '';
+    o.className = 'on page movies gl';
+    var bd = el('div', 'bd', o);
+    if (it && it.backdrop) bd.style.backgroundImage = 'url("' + it.backdrop + '")';
+    el('div', 'shade', o);
+    var top = el('div', 'mtop', o), tabs = el('div', 'tabs', top);
+    for (i = 0; i < MV_ROWS.length; i++) el('div', 'tab' + (i === mv.row ? ' on' : ''), tabs, MV_ROWS[i].name);
+    el('div', 'when', top, 'Movie night');
+    var hero = el('div', 'hero', o);
+    if (!tmdbKey()) {
+      el('div', 'mtitle', hero, 'Movie night');
+      el('div', 'over', hero, 'Add your free TMDB key in Settings › TMDB key, and new films on your services and Bollywood films show up here.');
+      return;
+    }
+    if (!it) { el('div', 'over', hero, mv.lists[mv.row] ? 'Nothing here right now.' : 'Finding films…'); return; }
+    el('div', 'kick', hero, mv.row === 0 ? 'New on your services' : 'Bollywood');
+    el('div', 'mtitle', hero, it.title);
+    el('div', 'meta', hero, [it.year, it.rating ? '★ ' + it.rating : ''].filter(function (x) { return x; }).join(' · '));
+    el('div', 'over', hero, it.overview.length > 220 ? it.overview.slice(0, 217).replace(/\s+\S*$/, '') + '…' : it.overview);
+    var btn = el('div', 'btn', hero, it.where === null || it.asking ? 'Finding where it streams…' :
+      it.where.length ? '▶  Watch on ' + it.where[0] : 'Not streaming in Canada right now');
+    if (it.where && it.where.length) setClass(btn, 'go', true);
+    var row = el('div', 'prow', o), l = mv.lists[mv.row], sel = mv.sel[mv.row];
+    el('div', 'plabel', row, MV_ROWS[mv.row].name);
+    var strip = el('div', 'posters', row);
+    if (sel < mv.first[mv.row]) mv.first[mv.row] = sel;
+    if (sel >= mv.first[mv.row] + MV_SHOWN) mv.first[mv.row] = sel - MV_SHOWN + 1;
+    for (i = mv.first[mv.row]; i < Math.min(l.length, mv.first[mv.row] + MV_SHOWN); i++) {
+      var ps = el('div', 'pc' + (i === sel ? ' focus' : ''), strip);
+      ps.style.backgroundImage = 'url("' + l[i].poster + '")';
+    }
+    el('div', 'hint', o, '← → films  ·  ↑ ↓ rows  ·  OK to watch  ·  Back to close');
+  }
+
+  function moviesKey(k, keys) {
+    var l = mv.lists[mv.row] || [];
+    if (k === keys.back || k === 27 || k === 8) { clearTimeout(mvTimer); closeOverlay(); return true; }
+    if (k === keys.left || k === keys.right) {
+      if (l.length) mv.sel[mv.row] = Math.max(0, Math.min(l.length - 1, mv.sel[mv.row] + (k === keys.left ? -1 : 1)));
+      renderMovies(); mvWhereSoon(); return true;
+    }
+    if (k === keys.up || k === keys.down) {
+      mv.row = (mv.row + (k === keys.up ? MV_ROWS.length - 1 : 1)) % MV_ROWS.length;
+      renderMovies(); mvWhereSoon(); return true;
+    }
+    if (k === keys.ok) {
+      var it = mvItem();
+      if (it && it.where && it.where.length && hooks.openService) {
+        if (!hooks.openService(it.where[0]) && hooks.toast) hooks.toast(it.where[0] + ' isn’t on this TV.');
+      }
       return true;
     }
     return true;
@@ -2675,7 +2813,7 @@ var Custom = (function () {
   function modes() {
     return [
       {label: night ? 'Tonight' : 'Today', symbol: 'sun', run: openToday},
-      {label: 'Movies', symbol: 'play', run: function () { setMovie(!movie); }, on: movie},
+      {label: 'Movies', symbol: 'play', run: openMovies},
       {label: 'Study', symbol: 'lightbulb', run: function () { startStudy(false); }},
       {label: 'Radio', symbol: 'radio', run: function () { startStudy(true); }},
       {label: 'Bollywood', symbol: 'speaker', run: bollywood},
@@ -2884,6 +3022,7 @@ var Custom = (function () {
       if (overlay === 'guest') return guestKey(k, keys);
       if (overlay === 'game') return gameKey(k, keys);
       if (overlay === 'today') return todayKey(k, keys);
+      if (overlay === 'movies') return moviesKey(k, keys);
       return study ? studyKey(k, keys) : false;
     },
     // for checking in a browser
