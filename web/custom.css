@@ -132,6 +132,13 @@ html.movie #stage.stars-on #stars { opacity: 0.35; }
 #study canvas.mk { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: none; opacity: 0.7; }
 #study.mk-on canvas.vis { display: none; }
 #study.mk-on canvas.mk { display: block; }
+/* Radio: the station's name where the timer would be, lower down, so the visuals have the middle */
+#study.radio .phase { top: 690px; font-size: 34px; }
+#study.radio .time { top: 750px; font-size: 76px; font-weight: 400; letter-spacing: 0; padding: 0 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ed #study.radio .time { font-size: 76px; font-weight: 400; }
+#study.radio .dots { display: none; }
+#study.radio canvas.vis, #study.radio canvas.mk { opacity: 0.9; }
+#study.radio-off .music { display: none; }
 .mk-full > * { visibility: hidden; }
 .mk-full > #study, .mk-full > #perf, .mk-full > #toast { visibility: visible; }
 #study.vis-on .phase, #study.vis-on .time, #study.vis-on .dots, #study.vis-on .music, #study.vis-on .hint { text-shadow: 0 2px 26px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.85); }

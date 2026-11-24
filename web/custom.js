@@ -1199,6 +1199,16 @@ var Custom = (function () {
   function studyDraw() {
     var s = $('study');
     if (!study || !s) return;
+    if (study.radio) {
+      var snd = study.current || SILENCE;
+      s.querySelector('.phase').textContent = study.paused ? 'Paused' : (snd.url || snd.noise ? 'Now playing' : 'Radio');
+      s.querySelector('.time').textContent = snd.url || snd.noise ? snd.name : 'Pick a station with ←';
+      s.querySelector('.dots').textContent = '';
+      setClass(s, 'paused', study.paused);
+      s.querySelector('.hint').textContent = (study.paused ? 'Paused · OK to carry on' : 'OK to pause') + '  ·  ↑ ↓ saved stations  ·  ← more  ·  → ' +
+        (study.visMode === 'milkdrop' ? 'next look' : 'next visual') + '  ·  Back to leave';
+      return;
+    }
     var gone = Math.floor(((study.paused ? study.pausedAt : Date.now()) - study.start) / 1000);
     var left = Math.max(0, study.length - gone);
     s.querySelector('.time').textContent = Math.floor(left / 60) + ':' + pad(left % 60);
@@ -1207,7 +1217,7 @@ var Custom = (function () {
     for (var i = 0; i < 4; i++) dots += i < (study.done % 4) ? '●' : '○';
     s.querySelector('.dots').textContent = dots;
     setClass(s, 'paused', study.paused);
-    s.querySelector('.hint').textContent = (study.paused ? 'Paused · OK to carry on' : 'OK to pause') + '  ·  ↑ ↓ saved sounds  ·  ← more sounds  ·  → skip  ·  Back to leave';
+    s.querySelector('.hint').textContent = (study.paused ? 'Paused · OK to carry on' : 'OK to pause') + (study.radioOn ? '  ·  ↑ ↓ saved sounds  ·  ← more sounds' : '  ·  ← radio') + '  ·  → skip  ·  Back to leave';
     if (!study.paused && left === 0) { studyNext(); studyDraw(); }
   }
 
@@ -1768,16 +1778,21 @@ var Custom = (function () {
   function musicLine() {
     var s = $('study'), snd = study.current;
     if (!s || !snd) return;
-    var text = (snd.url || snd.noise ? '♪ ' : '') + snd.name;
+    var text = study.radio ? (snd.meta || '') : (snd.url || snd.noise ? '♪ ' : '') + snd.name;
+    if (study.radio) studyDraw();
     if (study.failed) text += '  ·  couldn’t play this one, try another';
     else if (isSaved(snd)) text += '  ·  ★';
     if (study.tap && study.tap.ok && study.tap.url === snd.url) text += '  ·  visuals in sync';
+    text = text.replace(/^\s*·\s*/, '');
     s.querySelector('.music').textContent = text;
   }
 
-  function startStudy() {
+  /** Study, or Radio (the same screen without the timer: the station, the visuals, the picker). In Study the radio can be
+   *  switched off (kept in 'studyRadio'): then it's a plain timer, silent, no visuals. */
+  function startStudy(radio) {
     var s = $('study');
     s.innerHTML = '';
+    setClass(s, 'radio', !!radio);
     var cv = el('canvas', 'vis', s);
     cv.width = VIS_W;
     cv.height = VIS_H;
@@ -1797,8 +1812,12 @@ var Custom = (function () {
       mkViz: null, mkRaf: 0, mkFed: null, mkName: '', mkAt: 0, groove: null, tap: null, noTap: {},
       mkTierAt: 0, mkSince: 0, mkWin: null, mkFps: 0, mkGood: 0, mkSaved: -1,
       freq: new Uint8Array(256), wave: new Uint8Array(512), peaks: []};
-    playSound(stored('studyNow') || savedSounds()[0] || SILENCE);
+    study.radio = !!radio;
+    study.radioOn = radio || stored('studyRadio') !== false;
+    if (!study.radioOn) study.visMode = 'off';
+    playSound(study.radioOn ? stored('studyNow') || savedSounds()[0] || SILENCE : SILENCE);
     visStart();
+    setClass(s, 'radio-off', !study.radioOn);
     setClass(s, 'on', true);
     overlayState();
     study.timer = setInterval(studyDraw, 500);
@@ -1887,10 +1906,35 @@ var Custom = (function () {
   }
 
   function openPicker() {
-    study.picker = {stack: [{title: 'Sounds', items: STUDY_GENRES, sel: 0, note: ''}]};
+    var top = study.radio ? STUDY_GENRES : [{name: 'Radio in Study', radioToggle: true}].concat(study.radioOn ? STUDY_GENRES : []);
+    study.picker = {stack: [{title: study.radio ? 'Radio' : 'Sounds', items: top, sel: 0, note: study.radioOn ? '' : 'Off: just the timer, no sound or visuals.'}]};
     setClass($('study'), 'picking', true);
     renderPicker();
   }
+  /** Study's radio on or off: off is the plain timer (silence, no visuals); on brings back the last station and visuals. */
+  function radioSwitch(on) {
+    study.radioOn = on;
+    store('studyRadio', on);
+    var s = $('study');
+    setClass(s, 'radio-off', !on);
+    if (on) {
+      var vm = stored('studyVis');
+      study.visMode = visModes().indexOf(vm) >= 0 ? vm : visModes()[0];
+      playSound(stored('studyNow') || savedSounds()[0] || SILENCE);
+    } else {
+      var keep = stored('studyNow');
+      playSound(SILENCE);
+      if (keep) store('studyNow', keep);   // so On brings it back
+      study.visMode = 'off';
+    }
+    visStart();
+    var pk = study.picker;
+    pk.stack = [{title: 'Sounds', items: [{name: 'Radio in Study', radioToggle: true}].concat(on ? STUDY_GENRES : []), sel: 0,
+      note: on ? '' : 'Off: just the timer, no sound or visuals.'}];
+    renderPicker();
+    studyDraw();
+  }
+
   function closePicker() {
     study.picker = null;
     setClass($('study'), 'picking', false);
@@ -1997,8 +2041,8 @@ var Custom = (function () {
     for (var i = first; i < Math.min(v.items.length, first + PICKER_ROWS); i++) {
       var it = v.items[i], row = el('div', 'row' + (i === v.sel ? ' sel' : ''), box);
       var mark = v.stations ? (soundId(it) === cur ? '▶  ' : '') + (isSaved(it) ? '★  ' : '') : '';
-      el('span', '', row, mark + (it.visuals ? 'Visuals · ' + VIS_NAMES[study.visMode] : it.name));
-      if (it.visuals) el('span', 'm', row, 'OK to change');
+      el('span', '', row, mark + (it.visuals ? 'Visuals · ' + VIS_NAMES[study.visMode] : it.radioToggle ? 'Radio in Study · ' + (study.radioOn ? 'On' : 'Off') : it.name));
+      if (it.visuals || it.radioToggle) el('span', 'm', row, 'OK to change');
       else if (it.nextLook) el('span', 'm', row, !mkSupported() ? 'needs WebGL 2, not on this TV' : (study.visMode === 'milkdrop' && study.mkName ? study.mkName.slice(0, 34) : ''));
       else if (it.meta) el('span', 'm', row, it.meta);
     }
@@ -2048,6 +2092,7 @@ var Custom = (function () {
     if (k === keys.ok || k === keys.right) {
       var it = v.items[v.sel];
       if (!it) return true;
+      if (it.radioToggle) { radioSwitch(!study.radioOn); return true; }
       if (it.visuals) { visStep(); renderPicker(); }
       else if (it.nextLook) {
         if (mkSupported()) {
@@ -2080,9 +2125,14 @@ var Custom = (function () {
       studyDraw();
       return true;
     }
-    if (k === keys.right) { studyNext(); studyDraw(); return true; }
+    if (k === keys.right) {
+      if (!study.radio) { studyNext(); studyDraw(); }
+      else if (study.visMode === 'milkdrop') mkNext(MK_BLEND);
+      else { visStep(); studyDraw(); }
+      return true;
+    }
     if (k === keys.left) { openPicker(); return true; }
-    if (k === keys.up || k === keys.down) { cycleSaved(k === keys.up ? -1 : 1); return true; }
+    if (k === keys.up || k === keys.down) { if (study.radioOn) cycleSaved(k === keys.up ? -1 : 1); return true; }
     return true;   // everything else stays in Study
   }
 
@@ -2515,7 +2565,8 @@ var Custom = (function () {
     return [
       {label: night ? 'Tonight' : 'Today', symbol: 'sun', run: openToday},
       {label: 'Movies', symbol: 'play', run: function () { setMovie(!movie); }, on: movie},
-      {label: 'Study', symbol: 'lightbulb', run: startStudy},
+      {label: 'Study', symbol: 'lightbulb', run: function () { startStudy(false); }},
+      {label: 'Radio', symbol: 'radio', run: function () { startStudy(true); }},
       {label: 'Bollywood', symbol: 'speaker', run: bollywood},
       {label: 'Antakshari', symbol: 'sparkles', run: startGame},
       {label: 'Wi-Fi', symbol: 'wifi', run: openGuest}
