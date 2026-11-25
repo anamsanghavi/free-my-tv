@@ -696,7 +696,7 @@ var Custom = (function () {
       if (p.status_en && /ended|cancel/i.test(p.status_en)) continue;
       var colour = String(p.risk_colour_en || '').toLowerCase();
       var r = rank[colour] || 0;
-      if (!best || r > best.r) best = {r: r, colour: colour, name: p.alert_name_en || p.alert_short_name_en || 'weather alert', area: p.feature_name_en || ''};
+      if (!best || r > best.r) best = {r: r, colour: colour, name: p.alert_name_en || p.alert_short_name_en || 'weather alert', area: p.feature_name_en || '', text: String(p.alert_text_en || '').replace(/\s+/g, ' ').slice(0, 600)};
     }
     alertName = best ? best.name : '';
     weatherAlert = best;
@@ -2328,6 +2328,7 @@ var Custom = (function () {
 
   function openToday() {
     overlay = 'today';
+    tday.focus = 0; tday.left = 0; tday.detail = null; tday.tab = 0;
     clearInterval(todayTimer);
     todayTimer = setInterval(function () { if (overlay === 'today') { refreshScores(); refreshRates(); } }, 60000);   // fresh scores while it's open
     renderToday();
@@ -2351,7 +2352,11 @@ var Custom = (function () {
     var sc = trimScores, games, sky = $('overlay').querySelector('.tcard.sky');
     var sl;
     while (sky && sky.scrollHeight > sky.clientHeight + 2 && (sl = sky.querySelectorAll('.line')).length > 1) sky.removeChild(sl[sl.length - 1]);
-    if (sky && sky.parentNode && sky.scrollHeight > sky.clientHeight + 2) sky.parentNode.removeChild(sky);
+    // the sky card stays (OK opens its page): the rates' footnote makes room first
+    var rn = $('overlay').querySelector('.tcard.rates .note');
+    if (sky && rn && sky.scrollHeight > sky.clientHeight + 2) rn.parentNode.removeChild(rn);
+    var hrs = $('overlay').querySelector('.tcard.wx .hours');   // then the hourly row (its page has 24 hours)
+    if (sky && hrs && sky.scrollHeight > sky.clientHeight + 2) hrs.parentNode.removeChild(hrs);
     trimScores = null;
     if (!sc || !sc.parentNode) return;
     var ups;
@@ -2364,6 +2369,7 @@ var Custom = (function () {
   }
 
   function renderToday() {
+    if (tday.detail) { renderDetail(); return; }
     var o = $('overlay'), d = new Date(), w = null, c = coords(), i;
     try { w = Data.weather; } catch (e) {}
     o.innerHTML = '';
@@ -2373,7 +2379,7 @@ var Custom = (function () {
     var tl = el('div', 'tl', o);
     el('div', 'ptitle', tl, night ? 'Tonight' : 'Today');
     el('div', 'psub', tl, ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()] + ' ' + part);
-    el('div', 'pfoot', tl, 'Back to the menu');
+    el('div', 'pfoot', tl, 'OK for more \u00B7 Back to the menu');
     var tr = el('div', 'tr', o);
     if (weatherAlert) {
       var al = el('div', 'talert ' + (weatherAlert.colour || 'yellow'), tr);
@@ -2382,7 +2388,7 @@ var Custom = (function () {
     }
     var cards = el('div', 'tcards', tr), left = el('div', 'tcol', cards), right = el('div', 'tcol', cards);
 
-    var sw = el('div', 'tcard wx', left);
+    var sw = secCard('tcard wx', left, 0);
     el('div', 'kicker', sw, 'Weather');
     if (w) {
       var now = el('div', 'now', sw);
@@ -2416,7 +2422,7 @@ var Custom = (function () {
     // Scores (left, under the weather): your teams, then a scoreboard of what else is on
     refreshScores();
     refreshRates();
-    var sc = el('div', 'tcard scores', right);   // the whole right column (film of the day was dropped, Nov 2026)
+    var sc = secCard('tcard scores', right, 3);   // the whole right column (film of the day was dropped, Nov 2026)
     el('div', 'kicker', sc, 'Scores');
     if (!scores.rows) el('div', 'dim', sc, 'Finding today’s games…');
     else {
@@ -2472,7 +2478,7 @@ var Custom = (function () {
     trimScores = sc;
 
     // Rupee & gold
-    var rg = el('div', 'tcard rates', left);
+    var rg = secCard('tcard rates', left, 1);
     el('div', 'kicker', rg, 'Rates & gold');
     var rl = [];
     if (rates.cad) rl.push(['1 Canadian dollar', rupees(rates.cad, 2), rates.cadChg]);
@@ -2488,9 +2494,9 @@ var Custom = (function () {
       var gv = el('div', 'gv', rr, rl[i][1] + ' ');
       el('span', rl[i][2] >= 0 ? 'up' : 'down', gv, change(rl[i][2]));
     }
-    if (rl.length) el('div', 'note', rg, 'Change since the day before \u00B7 gold at the world spot price (shops add a premium; in India also duty and GST)');
+    if (rl.length) el('div', 'note', rg, 'Change since yesterday \u00B7 gold at world spot price');
 
-    var ss = el('div', 'tcard sky', left), lines = [];
+    var ss = secCard('tcard sky', left, 2), lines = [];
     el('div', 'kicker', ss, night ? 'Tonight’s sky' : 'The sky');
     if (window.Sky) {
       var m = Sky.moon(d, c.lat, c.lon), name = '';
@@ -2516,12 +2522,500 @@ var Custom = (function () {
     }
     if (!lines.length) el('div', 'dim', ss, 'Nothing to see right now');
     for (i = 0; i < lines.length; i++) { var ln = el('div', 'line', ss); el('span', 'k', ln, lines[i][0]); el('span', 'v', ln, lines[i][1]); }
-    setTimeout(fitScores, 60);   // once the page is laid out
+    setTimeout(function () { fitScores(); showFocus(); }, 60);   // once the page is laid out
+  }
+
+  // MARK: - Today's sections: the remote highlights a card, OK opens it full screen with more (asked for, Nov 2026)
+  // 0 weather, 1 rates & gold, 2 the sky (the left column, top to bottom), 3 scores (the right column).
+
+  var tday = {focus: 0, left: 0, detail: null, tab: 0};
+  var SEC_NAMES = ['Weather', 'Rates & gold', 'The sky', 'Scores'];
+  var SCORE_TABS = ['Chelsea', 'India', 'F1', 'Live'];
+
+  function secCard(cls, parent, n) {
+    var c = el('div', cls, parent);
+    c.setAttribute('data-sec', String(n));
+    c.onclick = function () { tday.focus = n; openDetail(n); };   // the Magic Remote's pointer
+    return c;
+  }
+
+  function secEl(n) { return $('overlay').querySelector('.tcard[data-sec="' + n + '"]'); }
+
+  function showFocus() {
+    if (tday.detail) return;
+    if (!secEl(tday.focus)) tday.focus = secEl(0) ? 0 : 3;   // the sky card may have been trimmed away
+    var cards = $('overlay').querySelectorAll('.tcard[data-sec]');
+    for (var i = 0; i < cards.length; i++) setClass(cards[i], 'foc', cards[i].getAttribute('data-sec') === String(tday.focus));
+  }
+
+  function moveFocus(k, keys) {
+    var f = tday.focus, n;
+    if (k === keys.right && f < 3) { tday.left = f; f = 3; }
+    else if (k === keys.left && f === 3) f = secEl(tday.left) ? tday.left : 0;
+    else if ((k === keys.up || k === keys.down) && f < 3) {
+      for (n = f + (k === keys.up ? -1 : 1); n >= 0 && n <= 2; n += (k === keys.up ? -1 : 1)) if (secEl(n)) { f = n; break; }
+    }
+    tday.focus = f;
+    showFocus();
+  }
+
+  function openDetail(n) {
+    tday.detail = SEC_NAMES[n] ? n + 1 : null;   // 1-based, so 0 stays "no page"
+    tday.tab = 0;
+    if (n === 0) fetchWxMore();
+    if (n === 1) fetchGoldHist();
+    if (n === 2) fetchSkyDays();
+    if (n === 3) fetchTable();
+    renderDetail();
   }
 
   function todayKey(k, keys) {
-    if (k === keys.back || k === 27 || k === 8 || k === keys.ok) closeOverlay();
+    if (k === keys.back || k === 27 || k === 8) {
+      if (tday.detail) { tday.detail = null; renderToday(); }
+      else closeOverlay();
+      return true;
+    }
+    if (tday.detail) {
+      if (tday.detail === 4 && (k === keys.left || k === keys.right)) {
+        tday.tab = (tday.tab + (k === keys.left ? SCORE_TABS.length - 1 : 1)) % SCORE_TABS.length;
+        renderDetail();
+      }
+      return true;
+    }
+    if (k === keys.ok) { openDetail(tday.focus); return true; }
+    if (k === keys.left || k === keys.right || k === keys.up || k === keys.down) moveFocus(k, keys);
     return true;
+  }
+
+  // The pages' own data, fetched when a page opens (never in the background), from the services Today already uses.
+  var more = {wx: null, wxAt: 0, gold: null, goldAt: 0, skyDays: null, skyAt: 0, table: null, tableAt: 0};
+
+  function meteoTime(iso, off) {
+    var m = /^(\d+)-(\d+)-(\d+)T?(\d*):?(\d*)/.exec(iso || '');
+    return m ? Date.UTC(+m[1], m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) - off * 1000 : 0;
+  }
+
+  function fetchWxMore() {
+    if (Date.now() - more.wxAt < 15 * 60000) return;
+    more.wxAt = Date.now();
+    var c = coords();
+    get('https://api.open-meteo.com/v1/forecast?latitude=' + c.lat + '&longitude=' + c.lon +
+      '&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,is_day' +
+      '&hourly=temperature_2m,precipitation_probability,weather_code,is_day,wind_speed_10m' +
+      '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,snowfall_sum,uv_index_max' +
+      '&timezone=auto&forecast_days=7&forecast_hours=24', {}, function (err, b) {
+      if (err || !b || !b.current) { more.wxAt = Date.now() - 14 * 60000; return; }   // try again in a minute
+      var off = b.utc_offset_seconds || 0, h = b.hourly || {}, dl = b.daily || {}, i, w = {now: b.current, hours: [], days: []};
+      for (i = 0; h.time && i < h.time.length; i++) w.hours.push({at: meteoTime(h.time[i], off), t: h.temperature_2m[i], p: h.precipitation_probability ? h.precipitation_probability[i] : null,
+        code: h.weather_code[i], day: h.is_day ? h.is_day[i] !== 0 : true, wind: h.wind_speed_10m ? h.wind_speed_10m[i] : null});
+      for (i = 0; dl.time && i < dl.time.length; i++) w.days.push({at: meteoTime(dl.time[i] + 'T12:00', off), max: dl.temperature_2m_max[i], min: dl.temperature_2m_min[i],
+        code: dl.weather_code[i], p: dl.precipitation_probability_max ? dl.precipitation_probability_max[i] : null, rain: dl.precipitation_sum ? dl.precipitation_sum[i] : 0,
+        snow: dl.snowfall_sum ? dl.snowfall_sum[i] : 0, uv: dl.uv_index_max ? dl.uv_index_max[i] : null});
+      more.wx = w;
+      if (overlay === 'today' && tday.detail === 1) renderDetail();
+    }, 10000);
+  }
+
+  function fetchSkyDays() {
+    if (Date.now() - more.skyAt < 6 * 3600000) return;
+    more.skyAt = Date.now();
+    var c = coords();
+    get('https://api.open-meteo.com/v1/forecast?latitude=' + c.lat + '&longitude=' + c.lon + '&daily=sunrise,sunset,daylight_duration&timezone=auto&past_days=1&forecast_days=8', {}, function (err, b) {
+      if (err || !b || !b.daily || !b.daily.time) { more.skyAt = 0; return; }
+      var off = b.utc_offset_seconds || 0, dl = b.daily, out = [];
+      for (var i = 0; i < dl.time.length; i++) out.push({at: meteoTime(dl.time[i] + 'T12:00', off), rise: meteoTime(dl.sunrise[i], off), set: meteoTime(dl.sunset[i], off), len: dl.daylight_duration ? dl.daylight_duration[i] : 0});
+      more.skyDays = out;
+      if (overlay === 'today' && tday.detail === 3) renderDetail();
+    }, 10000);
+  }
+
+  function fetchGoldHist() {
+    if (Date.now() - more.goldAt < 3600000) return;
+    more.goldAt = Date.now();
+    var hosts = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api.binance.us'], h = 0;
+    (function next() {
+      if (h >= hosts.length) { more.goldAt = Date.now() - 55 * 60000; return; }
+      get(hosts[h++] + '/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=46', {}, function (err, body) {
+        if (err || !body || !body.length) { next(); return; }
+        // [open time, open, high, low, close, ...]: one close a day, in US dollars an ounce
+        more.gold = body.map(function (k) { return {at: +k[0], usd: parseFloat(k[4])}; });
+        if (overlay === 'today' && tday.detail === 2) renderDetail();
+      }, 10000);
+    })();
+  }
+
+  function fetchTable() {
+    if (Date.now() - more.tableAt < 30 * 60000) return;
+    more.tableAt = Date.now();
+    get('https://site.api.espn.com/apis/v2/sports/soccer/eng.1/standings', {Accept: 'application/json'}, function (err, b) {
+      var grp = !err && b ? (b.children && b.children[0] ? b.children[0].standings : b.standings) : null;
+      var rows = grp && grp.entries ? grp.entries : [];
+      if (!rows.length) { more.tableAt = Date.now() - 25 * 60000; return; }
+      var stat = function (r, name) { var x = (r.stats || []).filter(function (s) { return s.name === name; })[0]; return x ? (x.value !== undefined ? x.value : parseFloat(x.displayValue)) : 0; };
+      more.table = rows.map(function (r) {
+        return {id: r.team ? String(r.team.id) : '', name: r.team ? (r.team.shortDisplayName || r.team.displayName) : '', rank: stat(r, 'rank'),
+          p: stat(r, 'gamesPlayed'), gd: stat(r, 'pointDifferential'), pts: stat(r, 'points')};
+      }).sort(function (a, b) { return (a.rank || 99) - (b.rank || 99) || b.pts - a.pts; });
+      if (overlay === 'today' && tday.detail === 4) renderDetail();
+    }, 10000);
+  }
+
+  // MARK: - The pages
+
+  function renderDetail() {
+    var o = $('overlay'), n = tday.detail - 1;
+    o.innerHTML = '';
+    o.className = 'on page today gl detail';
+    el('div', 'gshade', o);
+    var hd = el('div', 'dhead', o);
+    el('div', 'dk', hd, (night ? 'Tonight' : 'Today') + '  ›');
+    el('div', 'dt', hd, SEC_NAMES[n]);
+    if (n === 3) {
+      var tabs = el('div', 'dtabs', hd);
+      for (var i = 0; i < SCORE_TABS.length; i++) el('span', 'dtab' + (i === tday.tab ? ' on' : ''), tabs, SCORE_TABS[i]);
+    }
+    var body = el('div', 'dbody', o);
+    el('div', 'dfoot', o, (n === 3 ? '◀ ▶ switch tabs  ·  ' : '') + 'Back to Today');
+    if (n === 0) weatherPage(body);
+    else if (n === 1) ratesPage(body);
+    else if (n === 2) skyPage(body);
+    else scoresPage(body, SCORE_TABS[tday.tab]);
+  }
+
+  function panel(parent, cls, kicker) {
+    var p = el('div', 'dpanel ' + (cls || ''), parent);
+    if (kicker) el('div', 'kicker', p, kicker);
+    return p;
+  }
+
+  function kv(parent, k, v, cls) {
+    var r = el('div', 'kv' + (cls ? ' ' + cls : ''), parent);
+    el('span', 'k', r, k);
+    el('span', 'v', r, v);
+    return r;
+  }
+
+  function wait(parent, what) { el('div', 'dim', parent, 'Getting ' + what + '…'); }
+
+  function weatherPage(b) {
+    var w = more.wx, i;
+    var row = el('div', 'drow', b);
+    var nowp = panel(row, 'wnow', 'Now');
+    if (!w) { wait(nowp, 'the forecast'); return; }
+    var c = w.now, top = el('div', 'now', nowp);
+    el('div', 'temp', top, Data.degrees(c.temperature_2m));
+    var nd = el('div', 'nd', top);
+    el('div', 'cond', nd, Data.condition(c.weather_code, c.is_day !== 0));
+    el('div', 'dim', nd, 'Feels like ' + Data.degrees(c.apparent_temperature));
+    var st = el('div', 'stats', nowp);
+    kv(st, 'Humidity', Math.round(c.relative_humidity_2m) + '%');
+    kv(st, 'Wind', (window.Sky ? Sky.compass(c.wind_direction_10m) + ' ' : '') + Math.round(c.wind_speed_10m) + ' km/h');
+    kv(st, 'Gusts', Math.round(c.wind_gusts_10m) + ' km/h');
+    if (w.days[0] && w.days[0].uv !== null) kv(st, 'UV today', String(Math.round(w.days[0].uv)) + (w.days[0].uv >= 6 ? ' · high' : w.days[0].uv >= 3 ? ' · moderate' : ' · low'));
+    if (weatherAlert) {
+      var al = el('div', 'dalert ' + (weatherAlert.colour || 'yellow'), nowp);
+      el('b', '', al, weatherAlert.name.charAt(0).toUpperCase() + weatherAlert.name.substring(1));
+      if (weatherAlert.text) el('div', 'atext', al, weatherAlert.text);
+    }
+    // the week: a bar from low to high on a shared scale
+    var wk = panel(row, 'wweek', 'Next 7 days');
+    var lo = Infinity, hi = -Infinity;
+    for (i = 0; i < w.days.length; i++) { lo = Math.min(lo, w.days[i].min); hi = Math.max(hi, w.days[i].max); }
+    for (i = 0; i < w.days.length; i++) {
+      var d = w.days[i], r = el('div', 'wd', wk);
+      el('span', 'wn', r, i === 0 ? 'Today' : Data.weekday(d.at));
+      el('span', 'wc', r, Data.condition(d.code, true));
+      var what = d.snow >= 0.5 ? Math.round(d.snow) + ' cm' : d.rain >= 0.5 ? Math.round(d.rain) + ' mm' : '';
+      el('span', 'wp', r, d.p !== null ? d.p + '%' + (what ? ' · ' + what : '') : what);
+      el('span', 'wl', r, Data.degrees(d.min));
+      var bar = el('span', 'wbar', r), fill = el('span', 'wfill', bar);
+      var span = Math.max(1, hi - lo);
+      fill.style.left = Math.round((d.min - lo) / span * 100) + '%';
+      fill.style.width = Math.max(4, Math.round((d.max - d.min) / span * 100)) + '%';
+      el('span', 'wh', r, Data.degrees(d.max));
+    }
+    // the next 24 hours, every two
+    var hp = panel(b, 'whours', 'Next 24 hours · chance of rain or snow');
+    var strip = el('div', 'hstrip', hp);
+    for (i = 0; i < w.hours.length; i += 2) {
+      var hr = w.hours[i], cell = el('div', 'hc', strip);
+      el('div', 'at', cell, Data.hour(hr.at));
+      el('div', 't', cell, Data.degrees(hr.t));
+      var pb = el('div', 'pbar', cell), pf = el('div', 'pfill', pb);
+      pf.style.height = Math.max(0, Math.min(100, hr.p || 0)) + '%';
+      el('div', 'pp', cell, hr.p !== null ? hr.p + '%' : '');
+    }
+  }
+
+  /** A chart line through the values, as an SVG string, scaled to fit w×h. */
+  function spark(vals, w, h) {
+    var lo = Infinity, hi = -Infinity, i, pts = [];
+    for (i = 0; i < vals.length; i++) { lo = Math.min(lo, vals[i]); hi = Math.max(hi, vals[i]); }
+    var span = hi - lo || 1;
+    for (i = 0; i < vals.length; i++) pts.push((i / Math.max(1, vals.length - 1) * (w - 8) + 4).toFixed(1) + ',' + (h - 6 - (vals[i] - lo) / span * (h - 12)).toFixed(1));
+    var up = vals[vals.length - 1] >= vals[0];
+    return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><polyline fill="none" stroke="' + (up ? '#7FE0A0' : '#FF9A9A') +
+      '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="' + pts.join(' ') + '"/><circle cx="' + pts[pts.length - 1].split(',')[0] +
+      '" cy="' + pts[pts.length - 1].split(',')[1] + '" r="5" fill="#F5F5F7"/></svg>';
+  }
+
+  function cadFmt(v, d) { var p = v.toFixed(d).split('.'); return 'C$' + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (p[1] ? '.' + p[1] : ''); }
+
+  /** Each day's numbers: the ECB's rates (business days), and gold's daily close converted at that day's rate. */
+  function rateSeries() {
+    var h = rates.hist, out = {cad: [], usd: [], eurCad: [], usdCad: [], gold10: [], goldCad: []};
+    if (!h) return out;
+    var i, r, fx = [];
+    for (i = 0; i < h.days.length; i++) {
+      r = h.rates[h.days[i]];
+      if (!r || !r.CAD || !r.USD) continue;
+      fx.push({at: Date.parse(h.days[i] + 'T12:00:00Z'), r: r});
+      out.cad.push(1 / r.CAD); out.usd.push(1 / r.USD);
+      if (r.EUR) out.eurCad.push(r.CAD / r.EUR);
+      out.usdCad.push(r.CAD / r.USD);
+    }
+    // gold every day (it trades at weekends too), at the latest ECB rate on or before that day
+    for (i = 0; more.gold && i < more.gold.length; i++) {
+      var g = more.gold[i], f = null;
+      for (var j = 0; j < fx.length; j++) if (fx[j].at <= g.at + 86400000) f = fx[j].r;
+      if (!f) continue;
+      out.gold10.push(g.usd / f.USD / 31.1035 * 10);
+      out.goldCad.push(g.usd * f.CAD / f.USD);
+    }
+    return out;
+  }
+
+  function ratesPage(b) {
+    var s = rateSeries(), rows = [
+      ['1 Canadian dollar', s.cad, function (v) { return rupees(v, 2); }],
+      ['1 US dollar', s.usd, function (v) { return rupees(v, 2); }],
+      ['1 euro in CAD', s.eurCad, function (v) { return cadFmt(v, 4); }],
+      ['1 US dollar in CAD', s.usdCad, function (v) { return cadFmt(v, 4); }],
+      ['Gold · 24k, 10 g', s.gold10, function (v) { return rupees(v, 0); }],
+      ['Gold · 1 oz in CAD', s.goldCad, function (v) { return cadFmt(v, 0); }]
+    ];
+    var grid = el('div', 'rgrid', b);
+    for (var i = 0; i < rows.length; i++) {
+      var p = panel(grid, 'rtile', rows[i][0]), v = rows[i][1], f = rows[i][2];
+      if (v.length < 2) { wait(p, i >= 4 ? 'gold’s month' : 'the month’s rates'); continue; }
+      v = v.slice(-31);   // about a month of points (gold has one a day; the ECB one a business day)
+      var lastV = v[v.length - 1], wk = v[Math.max(0, v.length - (i >= 4 ? 8 : 6))];
+      el('div', 'rnow', p, f(lastV));
+      var ch = el('div', 'rchg', p);
+      el('span', lastV >= wk ? 'up' : 'down', ch, 'Week ' + change((lastV / wk - 1) * 100));
+      el('span', lastV >= v[0] ? 'up' : 'down', ch, 'Month ' + change((lastV / v[0] - 1) * 100));
+      var chart = el('div', 'rchart', p);
+      chart.innerHTML = spark(v, 500, 120);
+      el('div', 'rrange', p, 'Month low ' + f(Math.min.apply(null, v)) + '  ·  high ' + f(Math.max.apply(null, v)));
+    }
+    el('div', 'note', b, 'Rates: the European Central Bank’s, business days. Gold: the world spot price each day, converted at that day’s rate. Shops add a premium; in India also import duty and GST.');
+  }
+
+  function hm(mins) { mins = Math.round(mins); return Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min'; }
+
+  /** When the sun crosses `alt` degrees between from and to (ms), by halving; NaN if it doesn't. */
+  function sunCross(from, to, alt, c) {
+    var a = Sky.sun(new Date(from), c.lat, c.lon).alt - alt, b = Sky.sun(new Date(to), c.lat, c.lon).alt - alt;
+    if (a * b > 0) return NaN;
+    for (var i = 0; i < 20; i++) {
+      var mid = (from + to) / 2, m = Sky.sun(new Date(mid), c.lat, c.lon).alt - alt;
+      if (a * m <= 0) { to = mid; b = m; } else { from = mid; a = m; }
+    }
+    return (from + to) / 2;
+  }
+
+  function skyPage(b) {
+    var c = coords(), w = Data.weather, d = new Date(), i, days = more.skyDays;
+    var row = el('div', 'drow', b);
+    var sp = panel(row, 'ssun', 'The sun');
+    var today = days && days[1], yest = days && days[0];
+    var rise = today ? today.rise : w && w.sunrise, set = today ? today.set : w && w.sunset;
+    if (rise && set) {
+      var big = el('div', 'sbig', sp);
+      var r1 = el('div', 'sb', big); el('div', 'sk', r1, 'Sunrise'); el('div', 'sv', r1, Data.time(rise));
+      var r2 = el('div', 'sb', big); el('div', 'sk', r2, 'Sunset'); el('div', 'sv', r2, Data.time(set));
+      var len = (set - rise) / 60000;
+      kv(sp, 'Daylight', hm(len));
+      if (today && yest && today.len && yest.len) {
+        var diff = Math.round(today.len - yest.len), a = Math.abs(diff);
+        kv(sp, 'Since yesterday', (Math.floor(a / 60) ? Math.floor(a / 60) + ' min ' : '') + (a % 60) + ' s ' + (diff < 0 ? 'shorter' : 'longer'));
+      }
+      if (window.Sky) {
+        var g1 = sunCross(set - 3 * 3600000, set, 6, c), g2 = sunCross(set - 600000, set + 2 * 3600000, -4, c), bl = sunCross(set, set + 2 * 3600000, -6, c);
+        if (!isNaN(g1) && !isNaN(g2)) kv(sp, 'Golden hour', Data.time(g1) + ' – ' + Data.time(g2));
+        if (!isNaN(bl)) kv(sp, 'Dark enough for stars', 'after ' + Data.time(sunCross(set, set + 3 * 3600000, -12, c) || bl));
+      }
+      // the solstice: when the days turn
+      var y = d.getFullYear(), sol = [new Date(y, 5, 21), new Date(y, 11, 21), new Date(y + 1, 5, 21)].filter(function (x) { return x > d; })[0];
+      var dn = Math.ceil((sol - d) / 86400000);
+      kv(sp, sol.getMonth() === 11 ? 'Days start getting longer' : 'Days start getting shorter', 'after ' + MONTHS[sol.getMonth()] + ' ' + sol.getDate() + ' (' + dn + (dn === 1 ? ' day)' : ' days)'));
+    } else wait(sp, 'the sun’s times');
+
+    var mp = panel(row, 'smoon', 'The moon');
+    if (window.Sky) {
+      var m = Sky.moon(d, c.lat, c.lon), name = '';
+      for (i = 0; i < PHASES.length; i++) if (m.phase < PHASES[i][0]) { name = PHASES[i][1]; break; }
+      var disc = el('div', 'mdisc', mp), sh = el('div', 'mshade', disc);
+      // the shadow slides across: lit from the right while waxing (northern sky)
+      var lit = m.lit;
+      sh.style.left = (m.waxing ? -lit * 100 : lit * 100) + '%';
+      el('div', 'mname', mp, name);
+      el('div', 'dim', mp, Math.round(lit * 100) + '% lit');
+      var toFull = ((0.5 - m.phase + 1) % 1) * 29.53, toNew = ((1 - m.phase) % 1) * 29.53;
+      if (toFull < 0.5) toFull += 29.53;
+      if (toNew < 0.5) toNew += 29.53;
+      kv(mp, 'Next full moon', dayDate(new Date(Date.now() + toFull * 86400000).toISOString()));
+      kv(mp, 'Next new moon', dayDate(new Date(Date.now() + toNew * 86400000).toISOString()));
+      var t = Date.now(), shown = 0;
+      for (i = 0; i < sky.iss.length && shown < 2; i++) {
+        var p = sky.iss[i];
+        if (p.maxEl >= 25 && p.set > t) { kv(mp, shown ? 'And' : 'Space station', Data.weekday(p.rise) + ' ' + Data.time(p.rise) + ', look ' + Sky.compass(p.riseAz)); shown++; }
+      }
+      if (auroraWatch()) kv(mp, 'Aurora', 'possible tonight, look north');
+    }
+
+    var wp = panel(b, 'sweek', 'The week ahead');
+    if (!days) { wait(wp, 'the week'); return; }
+    var strip = el('div', 'swk', wp);
+    for (i = 1; i < days.length; i++) {
+      var cell = el('div', 'sc', strip);
+      el('div', 'at', cell, i === 1 ? 'Today' : Data.weekday(days[i].at));
+      el('div', 'sr', cell, '↑ ' + Data.time(days[i].rise));
+      el('div', 'ss', cell, '↓ ' + Data.time(days[i].set));
+      el('div', 'sl', cell, hm(days[i].len / 60));
+    }
+  }
+
+  function scoresPage(b, tab) {
+    var raw = scores.raw;
+    if (!raw) { wait(b, 'the scores'); return; }
+    if (tab === 'Chelsea') chelseaPage(b, raw);
+    else if (tab === 'India') indiaPage(b, raw);
+    else if (tab === 'F1') f1Page(b, raw);
+    else livePage(b);
+  }
+
+  function chelseaPage(b, raw) {
+    var row = el('div', 'drow', b), i;
+    var us = function (c) { return (c.competitors || []).filter(function (x) { return x.team && String(x.team.id) === MY_CLUB.id; })[0]; };
+    var them = function (c) { return (c.competitors || []).filter(function (x) { return !x.team || String(x.team.id) !== MY_CLUB.id; })[0]; };
+    var score = function (c) { return c && c.score ? (c.score.displayValue !== undefined ? c.score.displayValue : c.score) : ''; };
+    var lp = panel(row, 'cform', 'Last 5');
+    if (raw.clubTeam && raw.clubTeam.standingSummary) el('div', 'stand big', lp, raw.clubTeam.standingSummary);
+    var done = (raw.clubRes || []).filter(function (x) { return x.competitions && x.competitions[0].status.type.state === 'post'; })
+      .sort(function (a, b2) { return Date.parse(b2.date) - Date.parse(a.date); }).slice(0, 5);
+    if (!done.length) el('div', 'dim', lp, 'No results yet');
+    for (i = 0; i < done.length; i++) {
+      var c = done[i].competitions[0], u = us(c), o = them(c);
+      if (!u || !o) continue;
+      var r = el('div', 'fr', lp), res = u.winner ? 'W' : o.winner ? 'L' : 'D';
+      el('span', 'wdl ' + res.toLowerCase(), r, res);
+      el('span', 'fs', r, score(u) + '–' + score(o));
+      el('span', 'fo', r, (u.homeAway === 'home' ? 'v ' : 'at ') + (o.team.shortDisplayName || o.team.displayName));
+      el('span', 'fd', r, dayDate(done[i].date) + ((done[i].league && done[i].league.abbreviation) ? ' · ' + done[i].league.abbreviation : ''));
+    }
+    var tp = panel(row, 'ctable', 'Premier League');
+    var t = more.table;
+    if (!t) wait(tp, 'the table');
+    else {
+      var at = 0;
+      for (i = 0; i < t.length; i++) if (t[i].id === MY_CLUB.id) at = i;
+      var from = Math.max(0, Math.min(t.length - 7, at - 3));
+      var hd = el('div', 'trow hd', tp);
+      ['', 'Club', 'P', 'GD', 'Pts'].forEach(function (x, k) { el('span', ['tp', 'tn', 'tg', 'tg', 'tpts'][k], hd, x); });
+      for (i = from; i < Math.min(t.length, from + 7); i++) {
+        var tr = el('div', 'trow' + (t[i].id === MY_CLUB.id ? ' me' : ''), tp);
+        el('span', 'tp', tr, String(t[i].rank || i + 1));
+        el('span', 'tn', tr, t[i].name);
+        el('span', 'tg', tr, String(t[i].p));
+        el('span', 'tg', tr, (t[i].gd > 0 ? '+' : '') + t[i].gd);
+        el('span', 'tpts', tr, String(t[i].pts));
+      }
+      if (at > 0 && t[at - 1]) el('div', 'note', tp, (t[at - 1].pts - t[at].pts) + ' pts behind ' + t[at - 1].name + (t[0] && at > 1 ? ' · ' + (t[0].pts - t[at].pts) + ' off the top' : ''));
+    }
+    var np = panel(b, 'cnext', 'Coming up');
+    var up = (raw.clubFx || []).filter(function (x) { return x.competitions && x.competitions[0].status.type.state === 'pre'; })
+      .sort(function (a, b2) { return Date.parse(a.date) - Date.parse(b2.date); }).slice(0, 6);
+    if (!up.length) el('div', 'dim', np, 'No fixtures listed');
+    var strip = el('div', 'nstrip', np);
+    for (i = 0; i < up.length; i++) {
+      var nc = up[i].competitions[0], nu = us(nc), no = them(nc);
+      if (!nu || !no) continue;
+      var cell = el('div', 'nc', strip);
+      el('div', 'at', cell, dayDate(up[i].date));
+      el('div', 'nt', cell, (nu.homeAway === 'home' ? 'v ' : 'at ') + (no.team.shortDisplayName || no.team.displayName));
+      el('div', 'dim', cell, Data.time(Date.parse(up[i].date)) + ((up[i].league && up[i].league.abbreviation) ? ' · ' + up[i].league.abbreviation : ''));
+    }
+  }
+
+  function indiaPage(b, raw) {
+    var ev = (raw.cricket || []).filter(function (e) { return (e.competitors || []).some(isIndia); })
+      .sort(function (a, b2) { return Date.parse(a.date) - Date.parse(b2.date); });
+    var row = el('div', 'drow', b);
+    var past = panel(row, 'ipast', 'Results & live'), fut = panel(row, 'ifut', 'Coming up');
+    var np = 0, nf = 0;
+    for (var i = 0; i < ev.length; i++) {
+      var e = ev[i], cs = e.competitors || [], pre = e.status === 'pre';
+      var p = el('div', 'im', pre ? fut : past);
+      el('div', 'gc', p, shortComp(e) + ' · ' + dayDate(e.date));
+      for (var j = 0; j < cs.length; j++) {
+        var ln = el('div', 'ln' + (cs[j].winner ? ' lead' : ''), p);
+        el('span', 'n', ln, cs[j].displayName);
+        if (!pre && cs[j].score) el('b', '', ln, String(cs[j].score));
+      }
+      var sum = pre ? Data.time(Date.parse(e.date)) : (e.fullStatus && e.fullStatus.summary) || e.summary || '';
+      if (sum) el('div', 'gn' + (e.status === 'in' ? ' livetxt' : ''), p, (e.status === 'in' ? 'LIVE · ' : '') + sum);
+      if (pre) nf++; else np++;
+    }
+    if (!np) el('div', 'dim', past, 'No India matches in the last few days');
+    if (!nf) el('div', 'dim', fut, 'Nothing scheduled in ESPN’s window yet');
+  }
+
+  function f1Page(b, raw) {
+    var e = raw.f1 && raw.f1.events && raw.f1.events[0], row = el('div', 'drow', b), i;
+    var wp = panel(row, 'fweek', e ? gpName(e.name) : 'This weekend');
+    var NAMES = {FP1: 'Practice 1', FP2: 'Practice 2', FP3: 'Practice 3', Qual: 'Qualifying', Race: 'Race', Sprint: 'Sprint', SS: 'Sprint quali', SQ: 'Sprint quali'};
+    var cs = e ? e.competitions || [] : [];
+    if (!cs.length) el('div', 'dim', wp, 'No sessions listed');
+    for (i = 0; i < cs.length; i++) {
+      var c = cs[i], ab = c.type && c.type.abbreviation || '', st = c.status && c.status.type ? c.status.type.state : '';
+      var win = (c.competitors || []).filter(function (x) { return x.order === 1; })[0];
+      kv(wp, NAMES[ab] || ab || 'Session', st === 'post' ? (win && win.athlete ? '1st ' + win.athlete.displayName : 'Done') : st === 'in' ? 'LIVE now' : when(c.date), st === 'post' ? 'past' : st === 'in' ? 'now' : '');
+    }
+    var cal = raw.f1 && raw.f1.leagues && raw.f1.leagues[0] && raw.f1.leagues[0].calendar || [];
+    var ahead = cal.filter(function (x) { return Date.parse(x.endDate || x.startDate) > Date.now() && (!e || gpName(x.label) !== gpName(e.name)); });
+    if (ahead.length) el('div', 'note', wp, 'Then: ' + ahead.map(function (x) { var s0 = new Date(Date.parse(x.startDate)); return gpName(x.label) + ' (' + MONTHS[s0.getMonth()] + ' ' + s0.getDate() + ')'; }).join(' · '));
+    var sp = panel(row, 'fstand', 'Drivers’ championship');
+    var tb = raw.f1table, drivers = tb && tb.children ? (tb.children.filter(function (x) { return /Driver/.test(x.name || ''); })[0] || tb.children[0]) : null;
+    var rows = drivers && drivers.standings ? (drivers.standings.entries || []).slice() : [];
+    var pts = function (r2) { var s2 = (r2.stats || []).filter(function (x) { return x.name === 'championshipPts' || x.name === 'points'; })[0]; return s2 ? parseFloat(s2.value !== undefined ? s2.value : s2.displayValue) || 0 : 0; };
+    rows.sort(function (a, b2) { return pts(b2) - pts(a); });
+    if (!rows.length) el('div', 'dim', sp, 'No standings yet');
+    for (i = 0; i < rows.length && i < 10; i++) {
+      var tr = el('div', 'trow' + (i === 0 ? ' me' : ''), sp);
+      el('span', 'tp', tr, String(i + 1));
+      el('span', 'tn', tr, rows[i].athlete ? rows[i].athlete.displayName : '');
+      el('span', 'tpts', tr, String(pts(rows[i])));
+      el('span', 'tg wide', tr, i ? '−' + (pts(rows[0]) - pts(rows[i])) : '');
+    }
+    var left = ahead.length + (e && cs.some(function (x) { return x.status && x.status.type.state !== 'post'; }) ? 1 : 0);
+    if (rows.length > 1 && left) el('div', 'note', sp, left + (left === 1 ? ' race weekend left' : ' race weekends left') + ' \u00B7 a race win is worth 25 pts');
+  }
+
+  function livePage(b) {
+    var all = (scores.rows || []).concat(scores.raw && scores.raw.more || []);
+    if (!all.length) { el('div', 'dim', b, 'Nothing live or finished today'); return; }
+    var grid = el('div', 'lgrid', b);
+    for (var i = 0; i < all.length; i++) {
+      var g = all[i], p = panel(grid, 'lg', g.sport + (g.comp ? ' · ' + g.comp : ''));
+      for (var j = 0; j < g.lines.length; j++) {
+        var ln = el('div', 'ln' + (g.lines[j][2] ? ' lead' : ''), p);
+        el('span', 'n', ln, g.lines[j][0]);
+        if (g.lines[j][1]) el('b', '', ln, g.lines[j][1]);
+      }
+      el('div', 'gn' + (g.live ? ' livetxt' : ''), p, [g.live ? 'LIVE' : g.status, g.note].filter(function (x) { return x; }).join(' · '));
+      for (var k = 0; g.notes && k < g.notes.length; k++) el('div', 'gn', p, g.notes[k]);
+    }
   }
 
   function closeOverlay() {
@@ -2775,15 +3269,15 @@ var Custom = (function () {
     if (!e) return null;
     var cs = e.competitions || [], next = null, race = cs[cs.length - 1], i, now = Date.now();
     for (i = 0; i < cs.length && !next; i++) if (cs[i].status && cs[i].status.type && cs[i].status.type.state !== 'post') next = cs[i];
-    var kind = function (c) { var a = c && c.type && c.type.abbreviation; return a === 'Qual' ? 'Qualifying' : a === 'Race' ? 'Race' : a === 'Sprint' ? 'Sprint' : a || ''; };
+    var kind = function (c) { var a = c && c.type && c.type.abbreviation; return a === 'Qual' ? 'Qualifying' : a === 'Race' ? 'Race' : a === 'Sprint' ? 'Sprint' : /^S[SQ]/.test(a || '') ? 'Sprint quali' : a || ''; };
     var last = function (n) { return String(n || '').split(' ').pop(); };
     var g = {sport: 'F1', live: false, notes: []};
     if (next) {
       g.comp = gpName(e.name) + ' · this weekend';
       g.live = next.status.type.state === 'in';
-      g.status = g.live ? 'LIVE' : when(next.date);
+      g.status = g.live ? 'LIVE' : '';   // the sessions below carry their own times (a lone time here read as orphaned)
       g.lines = [];
-      for (i = 0; i < cs.length; i++) if (cs[i].status.type.state !== 'post' && /Qual|Race|Sprint/.test(cs[i].type && cs[i].type.abbreviation || ''))
+      for (i = 0; i < cs.length; i++) if (cs[i].status.type.state !== 'post' && /Qual|Race|Sprint|^S[SQ]/.test(cs[i].type && cs[i].type.abbreviation || ''))
         g.lines.push([kind(cs[i]), when(cs[i].date)]);
     } else {
       g.comp = gpName(e.name) + ' · result';
@@ -2819,10 +3313,12 @@ var Custom = (function () {
       scores.club = got.club || null;
       scores.india = got.india || null;
       scores.rows = got.games;
+      scores.raw = got;
       if (overlay === 'today') renderToday();
     }
     espnEvents('cricket', function (ev) {
       got.india = indiaTile(ev);
+      got.cricket = ev;
       // beside India: a live international (never domestic cricket)
       var intl = ev.filter(function (x) { var c = x.competitors || []; return x.status === 'in' && c.length === 2 && c[0].isNational && c[1].isNational && !c.some(isIndia); });
       var e = bestEvent(intl);
@@ -2846,10 +3342,12 @@ var Custom = (function () {
       });
       list.sort(function (a, b) { return (a.status === 'in' ? 0 : 1) - (b.status === 'in' ? 0 : 1) || FOOTBALL.indexOf(a.league) - FOOTBALL.indexOf(b.league); });
       list.slice(0, 2).forEach(function (x) { got.games.push(footballGame(x)); });
+      got.more = list.slice(2, 8).map(footballGame);
       one();
     });
     get('https://site.api.espn.com/apis/site/v2/sports/racing/f1/scoreboard', {Accept: 'application/json'}, function (err, body) {
       get('https://site.api.espn.com/apis/v2/sports/racing/f1/standings', {Accept: 'application/json'}, function (err2, table) {
+        got.f1 = !err && body; got.f1table = !err2 && table;
         var g = f1Game(!err && body, !err2 && table);
         if (g) got.games.push(g);
         one();
@@ -2857,6 +3355,7 @@ var Custom = (function () {
     }, 10000);
     get(TEAM + '?fixture=true', {Accept: 'application/json'}, function (err, fx) {
       get(TEAM, {Accept: 'application/json'}, function (err2, res) {
+        got.clubRes = (!err2 && res && res.events) || []; got.clubFx = (!err && fx && fx.events) || []; got.clubTeam = (res && res.team) || (fx && fx.team) || null;
         if ((!err && fx && fx.events) || (!err2 && res && res.events)) got.club = clubTile((res && res.events) || [], (fx && fx.events) || [], (res && res.team) || (fx && fx.team));
         one();
       }, 10000);
@@ -2869,11 +3368,12 @@ var Custom = (function () {
     var now = Date.now();
     if (now >= rates.fxNext) {
       rates.fxNext = now + RETRY;   // a failure waits 5 minutes; a success, 6 hours
-      get('https://api.frankfurter.dev/v1/' + isoDay(-8) + '..?base=INR&symbols=CAD,USD,EUR', {Accept: 'application/json'}, function (err, body) {
+      get('https://api.frankfurter.dev/v1/' + isoDay(-45) + '..?base=INR&symbols=CAD,USD,EUR', {Accept: 'application/json'}, function (err, body) {
         var days = !err && body && body.rates ? Object.keys(body.rates).sort() : [];
         if (!days.length) return;
         var a = body.rates[days[days.length - 1]], b = body.rates[days[Math.max(0, days.length - 2)]];
         if (!a || !a.CAD || !a.USD) return;
+        rates.hist = {days: days, rates: body.rates};   // the Rates page's charts
         rates.cad = 1 / a.CAD; rates.usd = 1 / a.USD;
         rates.cadChg = b && b.CAD ? (b.CAD / a.CAD - 1) * 100 : 0; rates.usdChg = b && b.USD ? (b.USD / a.USD - 1) * 100 : 0;
         if (a.EUR) { rates.eurCad = a.CAD / a.EUR; rates.eurCadChg = b && b.EUR && b.CAD ? ((a.CAD / a.EUR) / (b.CAD / b.EUR) - 1) * 100 : 0; }   // Canadian dollars to a euro

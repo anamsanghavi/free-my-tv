@@ -1201,3 +1201,168 @@ html.glass #menu .mfly, html.glass .night #menu .mfly { background: rgba(28, 33,
 #overlay.today.gl .rates .note { margin-top: 4px; }
 #overlay.today.gl .sky .line { padding: 8px 0; }
 #overlay.today.gl .tcard.sky { padding-top: 18px; padding-bottom: 14px; }
+/* Sofa scale (Nov 2026): Today is read from across the room: the title and the diorama keep the left, the cards fill
+   the rest edge to edge, and nothing is under 22px (main text 28). Less fits; fitScores trims the rest. */
+#overlay.today.gl .tr { left: 560px; right: 48px; top: 48px; bottom: 48px; }
+#overlay.today.gl .tl { left: 80px; bottom: 80px; width: 440px; }
+#overlay.today.gl .ptitle { font-size: 120px; }
+#overlay.today.gl .psub, .night #overlay.today.gl .psub { font-size: 36px; }
+#overlay.today.gl .pfoot { font-size: 26px; color: rgba(245, 245, 247, 0.7); }
+#overlay.today.gl .tcol + .tcol { padding-left: 24px; }
+#overlay.today.gl .tcard { padding: 24px 30px; border-radius: 28px; }
+#overlay.today.gl .kicker, .night #overlay.today.gl .kicker { font-size: 22px; color: rgba(245, 245, 247, 0.7); }
+#overlay.today.gl .talert { font-size: 28px; }
+#overlay.today.gl .dim { font-size: 26px; color: rgba(245, 245, 247, 0.75); }
+#overlay.today.gl .wx .temp { font-size: 110px; }
+#overlay.today.gl .wx .nd { max-width: 420px; }
+#overlay.today.gl .wx .cond { font-size: 36px; }
+#overlay.today.gl .hr .at, #overlay.today.gl .dy .at { font-size: 24px; color: rgba(245, 245, 247, 0.75); }
+#overlay.today.gl .hr .t { font-size: 32px; }
+#overlay.today.gl .dy .c { font-size: 22px; color: rgba(245, 245, 247, 0.7); }
+#overlay.today.gl .dy .t { font-size: 28px; }
+#overlay.today.gl .grow .gl, #overlay.today.gl .grow .gv { font-size: 28px; }
+#overlay.today.gl .rates .gl { max-width: 52%; }
+#overlay.today.gl .rates .gv { max-width: 48%; }
+#overlay.today.gl .rates .gv .up, #overlay.today.gl .rates .gv .down { font-size: 24px; }
+#overlay.today.gl .note { font-size: 22px; color: rgba(245, 245, 247, 0.6); }
+#overlay.today.gl .sky .line { font-size: 28px; }
+#overlay.today.gl .scores .cap { font-size: 22px; color: rgba(245, 245, 247, 0.65); }
+#overlay.today.gl .scores .team { padding: 16px 20px; }
+#overlay.today.gl .scores .th { font-size: 30px; }
+#overlay.today.gl .scores .crest { width: 38px; height: 38px; border-radius: 19px; line-height: 38px; font-size: 14px; }
+#overlay.today.gl .scores .stand, #overlay.today.gl .scores .comp, #overlay.today.gl .scores .gn, #overlay.today.gl .scores .st,
+#overlay.today.gl .scores .next, #overlay.today.gl .scores .gc, #overlay.today.gl .scores .st .sn, #overlay.today.gl .scores .up .uc { font-size: 24px; }
+#overlay.today.gl .scores .comp, #overlay.today.gl .scores .gc, #overlay.today.gl .scores .up .uc { color: rgba(245, 245, 247, 0.65); }
+#overlay.today.gl .scores .res, #overlay.today.gl .scores .ln, #overlay.today.gl .scores .up .ut { font-size: 28px; }
+#overlay.today.gl .scores .wdl { width: 34px; height: 34px; line-height: 34px; font-size: 20px; border-radius: 9px; }
+#overlay.today.gl .scores .st { width: 150px; }
+#overlay.today.gl .scores .up .uw { width: 170px; font-size: 24px; }
+#overlay.today.gl .scores .up .uc { margin-left: 170px; }
+#overlay.today.gl .live { font-size: 20px; }
+#overlay.today.gl .dy .t { font-size: 25px; letter-spacing: -0.02em; }
+#overlay.today.gl .scores .stand { font-size: 22px; }
+/* Today's sections take the remote's highlight (OK opens them) */
+#overlay.today.gl .tcard[data-sec] { -webkit-transition: box-shadow 0.15s, border-color 0.15s; transition: box-shadow 0.15s, border-color 0.15s; }
+#overlay.today.gl .tcard.foc { border-color: rgba(255, 255, 255, 0.95); box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85), 0 18px 48px rgba(0, 0, 0, 0.5); }
+/* a section's own page: full screen, the diorama dimmed behind */
+#overlay.today.gl.detail .gshade { background: rgba(5, 7, 12, 0.8); }
+#overlay.today.gl .dhead { position: absolute; left: 96px; right: 96px; top: 44px; white-space: nowrap; }
+#overlay.today.gl .dk { display: inline-block; font-size: 32px; color: rgba(245, 245, 247, 0.6); vertical-align: baseline; }
+#overlay.today.gl .dt { display: inline-block; margin-left: 16px; font-size: 60px; font-weight: 400; letter-spacing: -0.02em; vertical-align: baseline; }
+#overlay.today.gl .dtabs { display: inline-block; margin-left: 48px; vertical-align: 10px; }
+#overlay.today.gl .dtab { display: inline-block; margin-right: 12px; padding: 10px 26px; border-radius: 999px; font-size: 28px; color: rgba(245, 245, 247, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.22); }
+#overlay.today.gl .dtab.on { background: #F5F5F7; color: #0B0D12; border-color: #F5F5F7; font-weight: 600; }
+#overlay.today.gl .dbody { position: absolute; left: 96px; right: 96px; top: 150px; bottom: 96px; overflow: hidden; }
+#overlay.today.gl .dfoot { position: absolute; left: 96px; bottom: 40px; font-size: 24px; color: rgba(245, 245, 247, 0.6); }
+#overlay.today.gl .drow { display: -webkit-box; display: -webkit-flex; display: flex; margin-bottom: 24px; }
+#overlay.today.gl .drow > .dpanel { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; }
+#overlay.today.gl .drow > .dpanel + .dpanel { margin-left: 24px; }
+#overlay.today.gl .dpanel { box-sizing: border-box; padding: 26px 32px; border-radius: 28px; background: rgba(22, 26, 36, 0.72); border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 28px; overflow: hidden; }
+#overlay.today.gl .dpanel .kicker { font-size: 22px; }
+#overlay.today.gl .kv { padding: 10px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); overflow: hidden; font-size: 28px; }
+#overlay.today.gl .kicker + .kv { border-top: 0; }
+#overlay.today.gl .kv .k { float: left; color: rgba(245, 245, 247, 0.8); }
+#overlay.today.gl .kv .v { float: right; font-weight: 500; text-align: right; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .kv.past .v { color: rgba(245, 245, 247, 0.6); font-weight: 400; }
+#overlay.today.gl .kv.now .v { color: #FF8A8A; font-weight: 700; }
+#overlay.today.gl .dpanel .note { margin-top: 12px; }
+#overlay.today.gl.detail > .dbody > .note { margin-top: 4px; }
+/* weather */
+#overlay.today.gl .wnow { -webkit-box-flex: 0.8 !important; -webkit-flex: 0.8 !important; flex: 0.8 !important; }
+#overlay.today.gl .wnow .temp { font-size: 140px; }
+#overlay.today.gl .wnow .stats { margin-top: 14px; }
+#overlay.today.gl .dalert { margin-top: 16px; padding: 14px 20px; border-radius: 18px; border: 1px solid rgba(242, 196, 107, 0.6); background: rgba(242, 196, 107, 0.16); color: #FBE6B8; font-size: 24px; }
+#overlay.today.gl .dalert.orange { border-color: rgba(240, 160, 96, 0.65); background: rgba(240, 160, 96, 0.2); color: #FFC9A0; }
+#overlay.today.gl .dalert.red { border-color: rgba(255, 106, 90, 0.7); background: rgba(229, 72, 77, 0.22); color: #FFB3AA; }
+#overlay.today.gl .dalert .atext { margin-top: 6px; font-size: 22px; line-height: 1.35; max-height: 120px; overflow: hidden; }
+#overlay.today.gl .wd { padding: 9px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); white-space: nowrap; font-size: 28px; }
+#overlay.today.gl .kicker + .wd { border-top: 0; }
+#overlay.today.gl .wd > span { display: inline-block; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .wd .wn { width: 110px; }
+#overlay.today.gl .wd .wc { width: 230px; color: rgba(245, 245, 247, 0.8); }
+#overlay.today.gl .wd .wp { width: 190px; font-size: 24px; color: #8FC8FF; }
+#overlay.today.gl .wd .wl { width: 70px; text-align: right; color: rgba(245, 245, 247, 0.7); }
+#overlay.today.gl .wd .wh { width: 70px; text-align: right; font-weight: 600; }
+#overlay.today.gl .wbar { position: relative; width: 200px; height: 10px; margin: 0 16px; border-radius: 5px; background: rgba(255, 255, 255, 0.12); }
+#overlay.today.gl .wfill { position: absolute; top: 0; height: 10px; border-radius: 5px; background: #F2C46B; background: -webkit-linear-gradient(left, #8FC8FF, #F2C46B); background: linear-gradient(90deg, #8FC8FF, #F2C46B); }
+#overlay.today.gl .hstrip { white-space: nowrap; font-size: 0; }
+#overlay.today.gl .hc { display: inline-block; width: 8.33%; text-align: center; vertical-align: top; }
+#overlay.today.gl .hc .at { font-size: 22px; color: rgba(245, 245, 247, 0.7); }
+#overlay.today.gl .hc .t { margin-top: 4px; font-size: 32px; font-weight: 500; }
+#overlay.today.gl .pbar { position: relative; width: 16px; height: 60px; margin: 10px auto 0; border-radius: 8px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+#overlay.today.gl .pfill { position: absolute; left: 0; bottom: 0; width: 16px; background: #8FC8FF; }
+#overlay.today.gl .hc .pp { margin-top: 6px; font-size: 22px; color: #8FC8FF; }
+/* rates */
+#overlay.today.gl .rgrid { font-size: 0; }
+#overlay.today.gl .rtile { display: inline-block; width: 32%; margin: 0 2% 22px 0; vertical-align: top; padding: 22px 28px; }
+#overlay.today.gl .rtile:nth-child(3n) { margin-right: 0; }
+#overlay.today.gl .rnow { font-size: 44px; font-weight: 500; -webkit-font-feature-settings: 'tnum'; font-feature-settings: 'tnum'; }
+#overlay.today.gl .rchg { margin-top: 2px; font-size: 22px; }
+#overlay.today.gl .rchg span { margin-right: 18px; }
+#overlay.today.gl .rchg .up { color: #7FE0A0; }
+#overlay.today.gl .rchg .down { color: #FF9A9A; }
+#overlay.today.gl .rchart { margin-top: 10px; height: 120px; }
+#overlay.today.gl .rchart svg { display: block; width: 100%; height: 120px; }
+#overlay.today.gl .rrange { margin-top: 6px; font-size: 22px; color: rgba(245, 245, 247, 0.65); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* sky */
+#overlay.today.gl .sbig { white-space: nowrap; margin-bottom: 10px; }
+#overlay.today.gl .sb { display: inline-block; width: 50%; }
+#overlay.today.gl .sb .sk { font-size: 24px; color: rgba(245, 245, 247, 0.7); }
+#overlay.today.gl .sb .sv { font-size: 56px; font-weight: 300; }
+#overlay.today.gl .smoon { text-align: left; }
+#overlay.today.gl .mdisc { position: relative; float: right; width: 130px; height: 130px; border-radius: 65px; background: #E8E4D8; overflow: hidden; }
+#overlay.today.gl .mshade { position: absolute; top: 0; width: 130px; height: 130px; border-radius: 65px; background: #10131B; }
+#overlay.today.gl .mname { font-size: 44px; font-weight: 400; }
+#overlay.today.gl .smoon .dim { margin-bottom: 20px; }
+#overlay.today.gl .smoon .kv { clear: both; }
+#overlay.today.gl .swk { white-space: nowrap; font-size: 0; }
+#overlay.today.gl .swk .sc { display: inline-block; width: 14.28%; text-align: center; vertical-align: top; }
+#overlay.today.gl .swk .at { font-size: 24px; color: rgba(245, 245, 247, 0.75); }
+#overlay.today.gl .swk .sr, #overlay.today.gl .swk .ss { margin-top: 4px; font-size: 26px; }
+#overlay.today.gl .swk .sl { margin-top: 4px; font-size: 22px; color: #F2C46B; }
+/* scores */
+#overlay.today.gl .stand.big { margin-bottom: 12px; font-size: 30px; color: #9FE3DC; }
+#overlay.today.gl .fr { padding: 10px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); white-space: nowrap; overflow: hidden; font-size: 28px; }
+#overlay.today.gl .fr > span { display: inline-block; vertical-align: middle; }
+#overlay.today.gl .fr .wdl { width: 38px; height: 38px; margin-right: 14px; border-radius: 10px; line-height: 38px; text-align: center; font-size: 22px; font-weight: 700; color: #0B0D12; }
+#overlay.today.gl .wdl.w { background: #7FE0A0; } #overlay.today.gl .wdl.d { background: #C9CED8; } #overlay.today.gl .wdl.l { background: #FF8A8A; }
+#overlay.today.gl .fr .fs { width: 90px; font-weight: 600; }
+#overlay.today.gl .fr .fo { width: 300px; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .fr .fd { font-size: 22px; color: rgba(245, 245, 247, 0.6); }
+#overlay.today.gl .dpanel .trow { position: static; padding: 9px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); white-space: nowrap; font-size: 28px; }
+#overlay.today.gl .dpanel .trow.hd { border-top: 0; font-size: 20px; letter-spacing: 0.1em; color: rgba(245, 245, 247, 0.55); }
+#overlay.today.gl .dpanel .trow.me { margin: 0 -14px; padding-left: 14px; padding-right: 14px; border-radius: 12px; background: rgba(3, 70, 148, 0.55); border-top-color: transparent; font-weight: 600; }
+#overlay.today.gl .dpanel .trow > span { display: inline-block; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .trow .tp { width: 56px; color: rgba(245, 245, 247, 0.7); }
+#overlay.today.gl .trow .tn { width: 52%; }
+#overlay.today.gl .trow .tg { width: 13%; text-align: right; }
+#overlay.today.gl .trow .tg.wide { width: 18%; color: rgba(245, 245, 247, 0.6); }
+#overlay.today.gl .trow .tpts { width: 12%; text-align: right; font-weight: 600; }
+#overlay.today.gl .nstrip { white-space: nowrap; font-size: 0; }
+#overlay.today.gl .nstrip .nc { display: inline-block; width: 16.66%; padding-right: 16px; box-sizing: border-box; vertical-align: top; white-space: normal; }
+#overlay.today.gl .nstrip .at { font-size: 24px; color: #9FE3DC; }
+#overlay.today.gl .nstrip .nt { margin-top: 4px; font-size: 28px; }
+#overlay.today.gl .nstrip .dim { font-size: 22px; }
+#overlay.today.gl .im, #overlay.today.gl .lg .ln { font-size: 28px; }
+#overlay.today.gl .im { padding: 12px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+#overlay.today.gl .kicker + .im { border-top: 0; }
+#overlay.today.gl .dpanel .gc { font-size: 22px; font-weight: 600; letter-spacing: 0.04em; color: rgba(245, 245, 247, 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .dpanel .ln { font-size: 28px; line-height: 1.35; overflow: hidden; white-space: nowrap; color: rgba(245, 245, 247, 0.85); }
+#overlay.today.gl .dpanel .ln.lead { color: #FFFFFF; font-weight: 600; }
+#overlay.today.gl .dpanel .ln .n { float: left; max-width: 68%; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .dpanel .ln b { float: right; font-weight: 500; }
+#overlay.today.gl .dpanel .gn { margin-top: 4px; font-size: 22px; color: rgba(245, 245, 247, 0.65); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay.today.gl .dpanel .gn.livetxt { color: #FF8A8A; }
+#overlay.today.gl .lgrid { font-size: 0; }
+#overlay.today.gl .lgrid .lg { display: inline-block; width: 49%; margin: 0 2% 22px 0; vertical-align: top; }
+#overlay.today.gl .lgrid .lg:nth-child(2n) { margin-right: 0; }
+#overlay.today.gl .wnow .now { white-space: nowrap; }
+#overlay.today.gl .wnow .temp { display: inline-block; font-size: 120px; vertical-align: middle; }
+#overlay.today.gl .wnow .nd { display: inline-block; margin-left: 24px; vertical-align: middle; }
+#overlay.today.gl .wnow .stats { font-size: 0; }
+#overlay.today.gl .wnow .stats .kv { display: inline-block; width: 48%; box-sizing: border-box; vertical-align: top; }
+#overlay.today.gl .wnow .stats .kv:nth-child(2n) { margin-left: 4%; }
+#overlay.today.gl .wnow .stats .kv:nth-child(-n+2) { border-top: 0; }
+#overlay.today.gl .wnow .dalert .atext { max-height: 90px; }
