@@ -1196,3 +1196,8 @@ html.glass #menu .mfly, html.glass .night #menu .mfly { background: rgba(28, 33,
 /* cards keep their height; only the last card of a column gives way (and fitScores trims what's in it) */
 #overlay.today.gl .tcol > .tcard { -webkit-flex-shrink: 0; flex-shrink: 0; }
 #overlay.today.gl .tcol > .tcard:last-child { -webkit-flex-shrink: 1; flex-shrink: 1; min-height: 0; }
+/* six rates rows and the sky share the left column: a little tighter */
+#overlay.today.gl .rates .grow { padding: 7px 0; }
+#overlay.today.gl .rates .note { margin-top: 4px; }
+#overlay.today.gl .sky .line { padding: 8px 0; }
+#overlay.today.gl .tcard.sky { padding-top: 18px; padding-bottom: 14px; }
