@@ -2468,7 +2468,7 @@ var Custom = (function () {
     var rl = [];
     if (rates.cad) rl.push(['1 Canadian dollar', rupees(rates.cad, 2), rates.cadChg]);
     if (rates.usd) rl.push(['1 US dollar', rupees(rates.usd, 2), rates.usdChg]);
-    if (rates.cadEur) rl.push(['1 Canadian dollar in EUR', '\u20AC' + rates.cadEur.toFixed(4), rates.cadEurChg]);
+    if (rates.eurCad) rl.push(['1 euro in CAD', 'C$' + rates.eurCad.toFixed(4), rates.eurCadChg]);
     if (rates.usdCad) rl.push(['1 US dollar in CAD', 'C$' + rates.usdCad.toFixed(4), rates.usdCadChg]);
     if (rates.goldOz && rates.usd) rl.push(['Gold \u00B7 24k, 10 g', rupees(rates.goldOz * rates.usd / 31.1035 * 10, 0), rates.goldChg]);
     if (rates.goldOz && rates.usdCad) rl.push(['Gold \u00B7 1 oz in CAD', 'C$' + Math.round(rates.goldOz * rates.usdCad).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','), rates.goldChg]);   // a troy ounce, Canada's usual unit
@@ -2867,7 +2867,7 @@ var Custom = (function () {
         if (!a || !a.CAD || !a.USD) return;
         rates.cad = 1 / a.CAD; rates.usd = 1 / a.USD;
         rates.cadChg = b && b.CAD ? (b.CAD / a.CAD - 1) * 100 : 0; rates.usdChg = b && b.USD ? (b.USD / a.USD - 1) * 100 : 0;
-        if (a.EUR) { rates.cadEur = a.EUR / a.CAD; rates.cadEurChg = b && b.EUR && b.CAD ? ((a.EUR / a.CAD) / (b.EUR / b.CAD) - 1) * 100 : 0; }   // euros to a Canadian dollar
+        if (a.EUR) { rates.eurCad = a.CAD / a.EUR; rates.eurCadChg = b && b.EUR && b.CAD ? ((a.CAD / a.EUR) / (b.CAD / b.EUR) - 1) * 100 : 0; }   // Canadian dollars to a euro
         rates.usdCad = a.CAD / a.USD;   // Canadian dollars to a US dollar, by way of the rupee
         rates.usdCadChg = b && b.CAD && b.USD ? ((a.CAD / a.USD) / (b.CAD / b.USD) - 1) * 100 : 0;
         rates.fxNext = Date.now() + 6 * 3600000;
