@@ -2277,6 +2277,15 @@ var Custom = (function () {
     });
   }
 
+  // MARK: - Spelunkr (spelunkr.tv): 24/7 channels of Internet Archive video, opened in the TV's own browser. Their site
+  // can't be framed inside an app (it allows only its own pages), and its schedule isn't published for other apps, so
+  // it opens as itself; Back on the remote comes home. A native mode waits on Spelunkr's say-so.
+  function spelunkr() {
+    TV.launch('com.webos.app.browser', {target: 'https://spelunkr.tv/'}, function (ok) {
+      if (!ok && hooks.toast) hooks.toast('Couldn\u2019t open the browser for Spelunkr.');
+    });
+  }
+
   // MARK: - Guest Wi-Fi: a QR code guests scan to join (the network is typed on the TV, kept only on the TV)
 
   var overlay = null;   // 'guest' or 'game' while one of them fills the screen
@@ -3228,6 +3237,7 @@ var Custom = (function () {
       {label: 'Study', symbol: 'lightbulb', run: function () { startStudy(false); }},
       {label: 'Radio', symbol: 'radio', run: function () { startStudy(true); }},
       {label: 'Bollywood', symbol: 'speaker', run: bollywood},
+      {label: 'Spelunkr', symbol: 'play', run: spelunkr},
       {label: 'Antakshari', symbol: 'sparkles', run: startGame},
       {label: 'Wi-Fi', symbol: 'wifi', run: openGuest}
     ];
